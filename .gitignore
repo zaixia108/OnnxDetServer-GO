@@ -1,3 +1,6 @@
 /*.dll
 /src/*.dll
 .idea
+src/OnnxDet.cpp
+src/OnnxDet.h
+src/OnnxDet.lib
