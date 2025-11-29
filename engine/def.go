@@ -56,19 +56,19 @@ func ReadLinesReadFile(path string) ([]string, error) {
 
 type Detector struct {
 	ModelPath    string
-	names        []string
+	Names        []string
 	Conf         float32
 	Iou          float32
 	UseGPU       bool
-	instance     unsafe.Pointer
+	Instance     unsafe.Pointer
 	State        int
 	ErrorMessage string
 }
 
 func (d *Detector) New() bool {
-	d.instance = CreateDetector()
+	d.Instance = CreateDetector()
 	d.State = REGISTERED
-	return d.instance != nil
+	return d.Instance != nil
 }
 
 type NamesConf struct {
@@ -78,16 +78,16 @@ type NamesConf struct {
 
 func (d *Detector) LoadModel(modelPath string, names NamesConf, conf float32, iou float32, useGPU bool) bool {
 	if names.IsFile {
-		d.names, _ = ReadLinesReadFile(names.Data.(string))
+		d.Names, _ = ReadLinesReadFile(names.Data.(string))
 	} else {
 		rv := reflect.ValueOf(names.Data)
 		if rv.Kind() != reflect.Slice {
 			panic("names must be a slice or a file path")
 		} else {
 			n := rv.Len()
-			d.names = make([]string, n)
+			d.Names = make([]string, n)
 			for i := 0; i < n; i++ {
-				d.names[i] = rv.Index(i).Interface().(string)
+				d.Names[i] = rv.Index(i).Interface().(string)
 			}
 		}
 	}
@@ -96,33 +96,33 @@ func (d *Detector) LoadModel(modelPath string, names NamesConf, conf float32, io
 	d.Iou = iou
 	d.UseGPU = useGPU
 	d.State = IDLE
-	state := InitDetector(d.instance, d.ModelPath, d.Conf, d.Iou, d.UseGPU)
+	state := InitDetector(d.Instance, d.ModelPath, d.Conf, d.Iou, d.UseGPU)
 	return state
 }
 
 func (d *Detector) Destroy() {
-	DestroyDetector(d.instance)
+	DestroyDetector(d.Instance)
 	d.ModelPath = ""
 	d.Conf = 0
 	d.Iou = 0
 	d.UseGPU = false
-	d.instance = nil
+	d.Instance = nil
 	d.State = UNREGISTERED
 }
 
 type RetData struct {
-	success bool
-	data    any
+	Success bool
+	Data    any
 }
 
 func (d *Detector) Detect(img gocv.Mat) RetData {
 	switch d.State {
 	case UNREGISTERED:
-		return RetData{success: false, data: "Detector not registered"}
+		return RetData{Success: false, Data: "Detector not registered"}
 	case REGISTERED:
-		return RetData{success: false, data: "Model not loaded"}
+		return RetData{Success: false, Data: "Model not loaded"}
 	case BUSY:
-		return RetData{success: false, data: "Detector is busy"}
+		return RetData{Success: false, Data: "Detector is busy"}
 	}
 	d.State = BUSY
 	imgData := img.ToBytes()
@@ -130,14 +130,14 @@ func (d *Detector) Detect(img gocv.Mat) RetData {
 	height := img.Rows()
 	channels := img.Channels()
 
-	boxes, scores, classes, _, ok := Detect(d.instance, imgData, width, height, channels)
+	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, width, height, channels)
 	if !ok {
 		d.State = IDLE
-		return RetData{success: false, data: "Detection failed"}
+		return RetData{Success: false, Data: "Detection failed"}
 	}
 	resultDict := make(map[string][]result)
-	for item := range d.names {
-		resultDict[d.names[item]] = []result{}
+	for item := range d.Names {
+		resultDict[d.Names[item]] = []result{}
 	}
 	for i := 0; i < len(classes); i++ {
 		classIdx := int(classes[i])
@@ -157,9 +157,9 @@ func (d *Detector) Detect(img gocv.Mat) RetData {
 			box:    box,
 			center: center,
 		}
-		className := d.names[classIdx]
+		className := d.Names[classIdx]
 		resultDict[className] = append(resultDict[className], res)
 	}
 	d.State = IDLE
-	return RetData{success: true, data: resultDict}
+	return RetData{Success: true, Data: resultDict}
 }

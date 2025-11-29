@@ -7,49 +7,172 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"gocv.io/x/gocv"
 )
 
-type EngineInitRequest struct {
-	ModelPath   string   `json:"modelName" binding:"required"`
-	Names       []string `json:"names" binding:"required"`
-	Threads     int      `json:"threads"`
-	Conf        float32  `json:"conf"`
-	Iou         float32  `json:"iou"`
-	UseGPU      bool     `json:"useGPU"`
-	Description string   `json:"description"`
+const (
+	IDLE = 0x1001
+	BUSY = 0x1002
+)
+
+type EngineParam struct {
+	ModelPath string
+	Names     []string
+	Conf      float32
+	Iou       float32
+	UseGPU    bool
+	State     int
 }
 
-type InferenceRequest struct {
-	UUID  string `json:"uuid" binding:"required"`
-	Image byte   `json:"image" binding:"required"`
-}
-
-type detectorIdentify struct {
-	detector    *engine.Detector
+type worker struct {
+	mu          sync.Mutex
+	State       int
 	Description string
 	EngineType  int
+	detector    *engine.Detector
 }
 
-var dSequences map[string]detectorIdentify
+type instance struct {
+	id          string
+	worker      *worker
+	lastActive  time.Time
+	conn        *websocket.Conn
+	closeOnce   sync.Once
+	cancelTimer chan struct{}
+	cancelOnce  sync.Once
+}
 
-func (d *detectorIdentify) add2Seq(detector *engine.Detector, description string, engineType int) string {
-	d.detector = detector
-	d.Description = description
-	if engineType == engine.MultiThread {
-		panic("Multi-threading is not supported yet")
+var (
+	seqMu     sync.RWMutex
+	workers   = map[string]*worker{}
+	sessionMu sync.RWMutex
+	sessions  = map[string]*instance{}
+	upgrader  = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
 	}
-	d.EngineType = engineType
-	if dSequences == nil {
-		dSequences = make(map[string]detectorIdentify)
+	idleTimeout = 1000 * time.Millisecond
+)
+
+func addWorker(description string, engineType int, param EngineParam) string {
+	w := &worker{
+		State:       IDLE,
+		Description: description,
+		EngineType:  engineType,
+		detector: &engine.Detector{
+			ModelPath: param.ModelPath,
+			Names:     param.Names,
+			Conf:      param.Conf,
+			Iou:       param.Iou,
+			UseGPU:    param.UseGPU,
+			State:     param.State,
+			Instance:  engine.CreateDetector(),
+		},
 	}
-	// Generate a unique ID for the sequence
-	UUID := uuid.New().String()
-	dSequences[UUID] = *d
-	return UUID
+	id := uuid.New().String()
+	seqMu.Lock()
+	workers[id] = w
+	seqMu.Unlock()
+	if param.UseGPU {
+		// 预热 GPU
+		fmt.Println("Using GPU ,Warming up for worker", id)
+		emptyMat := gocv.NewMat()
+		for i1 := 0; i1 < 3; i1++ {
+			_ = w.detector.Detect(emptyMat)
+		}
+		_ = emptyMat.Close()
+		fmt.Println("Warm up Finished for worker", id)
+	}
+
+	return id
+}
+
+func allocInstance() (string, string, error) {
+	seqMu.RLock()
+	var chosenID string
+	var chosen *worker
+	for id, w := range workers {
+		w.mu.Lock()
+		if w.State == IDLE {
+			w.State = BUSY
+			chosenID = id
+			chosen = w
+			w.mu.Unlock()
+			break
+		}
+		w.mu.Unlock()
+	}
+	seqMu.RUnlock()
+	if chosen == nil {
+		return "", "", errors.New("no available workers")
+	}
+
+	sessionID := uuid.New().String()
+	inst := &instance{
+		id:          sessionID,
+		worker:      chosen,
+		lastActive:  time.Now(),
+		cancelTimer: make(chan struct{}),
+	}
+
+	sessionMu.Lock()
+	sessions[sessionID] = inst
+	sessionMu.Unlock()
+
+	return sessionID, chosenID, nil
+}
+
+func releaseInstance(sessionID string) bool {
+	sessionMu.Lock()
+	inst, ok := sessions[sessionID]
+	if ok {
+		delete(sessions, sessionID)
+	}
+	sessionMu.Unlock()
+	if !ok {
+		return false
+	}
+
+	inst.closeOnce.Do(func() {
+		if inst.conn != nil {
+			_ = inst.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "1000 ms not active, released"))
+			_ = inst.conn.Close()
+		}
+	})
+	inst.cancelOnce.Do(func() {
+		close(inst.cancelTimer)
+	})
+	inst.worker.mu.Lock()
+	inst.worker.State = IDLE
+	inst.worker.mu.Unlock()
+	return true
+}
+
+func startIdleMonitor(inst *instance) {
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-inst.cancelTimer:
+				return
+			case <-ticker.C:
+				if time.Since(inst.lastActive) > idleTimeout {
+					_ = releaseInstance(inst.id)
+					return
+				}
+			}
+		}
+	}()
 }
 
 // Base64ToMat 将 base64 字符串（可带 data:image/... 前缀）转为 gocv.Mat
@@ -64,7 +187,10 @@ func Base64ToMat(b64 string) (gocv.Mat, error) {
 		return gocv.NewMat(), err
 	}
 
-	mat, _ := gocv.IMDecode(data, gocv.IMReadColor)
+	mat, err := gocv.IMDecode(data, gocv.IMReadColor)
+	if err != nil {
+		return gocv.NewMat(), err
+	}
 	if mat.Empty() {
 		// IMDecode 返回空 Mat 表示解码失败
 		err := mat.Close()
@@ -78,124 +204,129 @@ func Base64ToMat(b64 string) (gocv.Mat, error) {
 
 func main() {
 	r := gin.Default()
-	r.GET("/api/Engine/init/:engineType", func(c *gin.Context) {
-		engineTypeStr := c.Param("engineType")
-		var engineType int
-		_, err := fmt.Sscanf(engineTypeStr, "%d", &engineType)
+	r.POST("/api/workers/init/:count", func(c *gin.Context) {
+		countStr := c.Param("count")
+		var count int
+		_, err := fmt.Sscanf(countStr, "%d", &count)
+		if err != nil || count <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid count"})
+			return
+		}
+
+		var initParam EngineParam
+		if err := c.ShouldBindJSON(&initParam); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 设置默认值（如果客户端未提供）
+		if initParam.Conf == 0 {
+			initParam.Conf = 0.5
+		}
+		if initParam.Iou == 0 {
+			initParam.Iou = 0.5
+		}
+		if initParam.Names == nil {
+			initParam.Names = []string{}
+		}
+
+		fmt.Println("Creating", count, "workers with param:", initParam)
+		ids := make([]string, count)
+		for i := 0; i < count; i++ {
+			id := addWorker("Sample Worker", engine.MultiThread, initParam)
+			ids[i] = id
+		}
+		c.JSON(http.StatusOK, gin.H{"data": ids})
+	})
+	r.GET("/api/workers/check/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		seqMu.RLock()
+		w, exists := workers[id]
+		seqMu.RUnlock()
+		if !exists {
+			c.JSON(404, gin.H{"error": "Worker not found"})
+			return
+		}
+		w.mu.Lock()
+		state := w.State
+		description := w.Description
+		engineType := w.EngineType
+		w.mu.Unlock()
+		retData := map[string]any{
+			"state":       state,
+			"description": description,
+			"engineType":  engineType,
+		}
+		c.JSON(200, gin.H{"data": retData})
+	})
+	r.POST("/api/workers/alloc", func(c *gin.Context) {
+		sessionID, workerID, err := allocInstance()
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(503, gin.H{"error": "All workers are busy"})
 			return
 		}
-		if engineType != engine.SingleThread && engineType != engine.MultiThread {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid engine type"})
-			return
-		}
-
-		req := new(EngineInitRequest)
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if req.Threads <= 0 {
-			req.Threads = 1 // 默认单线程
-		}
-		if req.Conf <= 0 {
-			req.Conf = 0.5 // 默认置信度
-		}
-		if req.Iou <= 0 {
-			req.Iou = 0.5 // 默认IOU
-		}
-		if req.Description == "" {
-			req.Description = "Default Detector"
-		}
-		detector := engine.Detector{}
-		detector.New()
-		names := engine.NamesConf{}
-		names.IsFile = false
-		names.Data = req.Names
-		detector.LoadModel(req.ModelPath, names, req.Conf, req.Iou, req.UseGPU)
-		seqdet := detectorIdentify{}
-		seqdet.EngineType = engineType
-		seqdet.Description = req.Description
-		seqdet.detector = &detector
-		Id := seqdet.add2Seq(&detector, req.Description, engineType)
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Engine initialized successfully",
-			"data": gin.H{
-				"id":          Id,
-				"description": seqdet.Description,
-				"engineType":  seqdet.EngineType,
-			},
+		c.JSON(200, gin.H{
+			"sessionID": sessionID,
+			"workerID":  workerID,
+			"wsURL":     fmt.Sprintf("ws://%s/ws/%s", c.Request.Host, sessionID),
+			"timeoutMs": idleTimeout.Milliseconds(),
 		})
 	})
-	r.POST("/api/inference/:UUID", func(c *gin.Context) {
-		UUID := c.Param("UUID")
-		detector, exists := dSequences[UUID]
+	r.POST("/api/workers/:sessionID/release", func(c *gin.Context) {
+		sessionID := c.Param("sessionID")
+		if !releaseInstance(sessionID) {
+			c.JSON(404, gin.H{"error": "Session not found"})
+			return
+		}
+		c.JSON(200, gin.H{"data": "Session released"})
+	})
+	r.GET("/ws/:sessionID", func(c *gin.Context) {
+		sessionID := c.Param("sessionID")
+		// 在升级前检查会话是否存在
+		sessionMu.RLock()
+		inst, exists := sessions[sessionID]
+		sessionMu.RUnlock()
 		if !exists {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
+			c.JSON(404, gin.H{"error": "Session not found"})
 			return
 		}
-		imageBase64 := c.PostForm("image")
-		if imageBase64 == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Image data is required"})
-			return
-		}
-		imgData, err := Base64ToMat(imageBase64)
+
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to decode image: " + err.Error()})
+			// 升级失败，不要再写 JSON
 			return
 		}
-		defer func(imgData *gocv.Mat) {
-			err := imgData.Close()
+		inst.conn = conn
+		conn.SetReadLimit(20 * 1024 * 1024)
+
+		startIdleMonitor(inst)
+		for {
+			mt, msg, err := conn.ReadMessage()
 			if err != nil {
-				fmt.Println("Failed to release image data:", err)
+				// 客户端断开或读取错误，释放实例
+				releaseInstance(sessionID)
+				return
 			}
-		}(&imgData)
-
-		results := detector.detector.Detect(imgData)
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Inference completed successfully",
-			"data":    results,
-		})
-	})
-	r.GET("/api/Engine/destroy/:UUID", func(c *gin.Context) {
-		UUID := c.Param("UUID")
-		detector, exists := dSequences[UUID]
-		if !exists {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
-			return
+			inst.lastActive = time.Now()
+			switch mt {
+			case websocket.TextMessage:
+				// 文本消息：base64 图像
+				mat, err := Base64ToMat(string(msg))
+				if err != nil {
+					_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("invalid image: %v", err)))
+					continue
+				}
+				result := inst.worker.detector.Detect(mat)
+				_ = mat.Close()
+				if !result.Success {
+					_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("inference error: %v", result.Data)))
+					continue
+				}
+				_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("inference result: %v", result.Data)))
+			default:
+				_ = conn.WriteMessage(websocket.TextMessage, []byte("unsupported message type"))
+			}
 		}
-		detector.detector.Destroy()
-		delete(dSequences, UUID)
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Detector destroyed successfully",
-		})
-		fmt.Println(dSequences)
 	})
-	r.GET("/api/Engine/check/:UUID", func(c *gin.Context) {
-		UUID := c.Param("UUID")
-		detector, exists := dSequences[UUID]
-		if !exists {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
-			return
-		}
-		var detectorState map[string]any
-		detectorState = make(map[string]any)
-		detectorState["description"] = detector.Description
-		detectorState["engineType"] = detector.EngineType
-		detectorState["modelPath"] = detector.detector.ModelPath
-		detectorState["conf"] = detector.detector.Conf
-		detectorState["iou"] = detector.detector.Iou
-		detectorState["useGPU"] = detector.detector.UseGPU
-		detectorState["state"] = detector.detector.State
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Detector status retrieved successfully",
-			"data":    detectorState,
-		})
-	})
-	err := r.Run(":8080")
-	if err != nil {
-		fmt.Println(err)
-	}
+	_ = r.Run(":8080")
 }
