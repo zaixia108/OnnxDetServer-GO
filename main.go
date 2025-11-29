@@ -22,12 +22,13 @@ const (
 )
 
 type EngineParam struct {
-	ModelPath string
-	Names     []string
-	Conf      float32
-	Iou       float32
-	UseGPU    bool
-	State     int
+	ModelPath   string
+	Names       []string
+	Conf        float32
+	Iou         float32
+	UseGPU      bool
+	State       int
+	Description string
 }
 
 type worker struct {
@@ -204,6 +205,9 @@ func Base64ToMat(b64 string) (gocv.Mat, error) {
 
 func main() {
 	r := gin.Default()
+	r.GET("/api/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "pong"})
+	})
 	r.POST("/api/workers/init/:count", func(c *gin.Context) {
 		countStr := c.Param("count")
 		var count int
@@ -233,9 +237,13 @@ func main() {
 		fmt.Println("Creating", count, "workers with param:", initParam)
 		ids := make([]string, count)
 		for i := 0; i < count; i++ {
-			id := addWorker("Sample Worker", engine.MultiThread, initParam)
+			id := addWorker("Sample Worker", engine.SingleThread, initParam)
 			ids[i] = id
+			seqMu.Lock()
+			workers[id].Description = initParam.Description
+			seqMu.Unlock()
 		}
+
 		c.JSON(http.StatusOK, gin.H{"data": ids})
 	})
 	r.GET("/api/workers/check/:id", func(c *gin.Context) {
@@ -326,6 +334,20 @@ func main() {
 			default:
 				_ = conn.WriteMessage(websocket.TextMessage, []byte("unsupported message type"))
 			}
+		}
+	})
+	r.POST("/api/models/upload", func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "File upload failed: " + err.Error()})
+			return
+		}
+
+		modelPath := fmt.Sprintf("./models/%s", file.Filename)
+		err = c.SaveUploadedFile(file, modelPath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file: " + err.Error()})
+			return
 		}
 	})
 	_ = r.Run(":8080")
