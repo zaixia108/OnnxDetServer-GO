@@ -1,6 +1,11 @@
+/*.jpg
+/models
+/src
 /*.dll
-/src/*.dll
+112913
+/*.1
 .idea
+/src/*.dll
 src/OnnxDet.cpp
 src/OnnxDet.h
 src/OnnxDet.lib

@@ -65,32 +65,38 @@ var (
 )
 
 func addWorker(description string, engineType int, param EngineParam) string {
+	detector := &engine.Detector{}
+	detector.New()
+	names := engine.NamesConf{
+		IsFile: false,
+		Data:   param.Names,
+	}
+	detector.LoadModel(param.ModelPath, names, param.Conf, param.Iou, param.UseGPU)
 	w := &worker{
 		State:       IDLE,
 		Description: description,
 		EngineType:  engineType,
-		detector: &engine.Detector{
-			ModelPath: param.ModelPath,
-			Names:     param.Names,
-			Conf:      param.Conf,
-			Iou:       param.Iou,
-			UseGPU:    param.UseGPU,
-			State:     param.State,
-			Instance:  engine.CreateDetector(),
-		},
+		detector:    detector,
 	}
 	id := uuid.New().String()
 	seqMu.Lock()
 	workers[id] = w
 	seqMu.Unlock()
 	if param.UseGPU {
-		// 预热 GPU
 		fmt.Println("Using GPU ,Warming up for worker", id)
-		emptyMat := gocv.NewMat()
+		warmMat := gocv.NewMatWithSize(32, 32, gocv.MatTypeCV8UC3) // 小黑图，非空
 		for i1 := 0; i1 < 3; i1++ {
-			_ = w.detector.Detect(emptyMat)
+			// 防止 Detect 内部 panic 导致服务崩溃，保护性调用
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Println("panic during warmup detect:", r)
+					}
+				}()
+				_ = w.detector.Detect(warmMat)
+			}()
 		}
-		_ = emptyMat.Close()
+		_ = warmMat.Close()
 		fmt.Println("Warm up Finished for worker", id)
 	}
 
@@ -169,6 +175,7 @@ func startIdleMonitor(inst *instance) {
 			case <-ticker.C:
 				if time.Since(inst.lastActive) > idleTimeout {
 					_ = releaseInstance(inst.id)
+					fmt.Println("IdleMonitor timed out")
 					return
 				}
 			}
@@ -270,10 +277,10 @@ func main() {
 	r.POST("/api/workers/alloc", func(c *gin.Context) {
 		sessionID, workerID, err := allocInstance()
 		if err != nil {
-			c.JSON(503, gin.H{"error": "All workers are busy"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "All workers are busy"})
 			return
 		}
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"sessionID": sessionID,
 			"workerID":  workerID,
 			"wsURL":     fmt.Sprintf("ws://%s/ws/%s", c.Request.Host, sessionID),
@@ -313,6 +320,7 @@ func main() {
 			if err != nil {
 				// 客户端断开或读取错误，释放实例
 				releaseInstance(sessionID)
+				fmt.Println("Connection closed for session:", sessionID, "error:", err)
 				return
 			}
 			inst.lastActive = time.Now()
@@ -320,6 +328,8 @@ func main() {
 			case websocket.TextMessage:
 				// 文本消息：base64 图像
 				mat, err := Base64ToMat(string(msg))
+				// save to local for debug
+				gocv.IMWrite(fmt.Sprintf("./debug_%s.jpg", sessionID), mat)
 				if err != nil {
 					_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("invalid image: %v", err)))
 					continue
@@ -349,6 +359,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file: " + err.Error()})
 			return
 		}
+		c.JSON(http.StatusOK, gin.H{"data": modelPath})
 	})
 	_ = r.Run(":8080")
 }
