@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	IDLE = 0x1001
-	BUSY = 0x1002
+	IDLE    = 0x1001
+	BUSY    = 0x1002
+	TIMEOUT = 10000
 )
 
 type EngineParam struct {
@@ -61,7 +62,7 @@ var (
 			return true
 		},
 	}
-	idleTimeout = 1000 * time.Millisecond
+	idleTimeout = TIMEOUT * time.Millisecond
 )
 
 func addWorker(description string, engineType int, param EngineParam) string {
@@ -151,7 +152,7 @@ func releaseInstance(sessionID string) bool {
 
 	inst.closeOnce.Do(func() {
 		if inst.conn != nil {
-			_ = inst.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "1000 ms not active, released"))
+			_ = inst.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "TIMEOUT ms not active, released"))
 			_ = inst.conn.Close()
 		}
 	})
