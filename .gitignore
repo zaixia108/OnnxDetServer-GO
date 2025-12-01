@@ -9,3 +9,4 @@
 src/OnnxDet.cpp
 src/OnnxDet.h
 src/OnnxDet.lib
+.dist
