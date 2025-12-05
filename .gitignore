@@ -9,4 +9,4 @@
 src/OnnxDet.cpp
 src/OnnxDet.h
 src/OnnxDet.lib
-main.go.bk
+.dist
