@@ -17,6 +17,7 @@ import (
 	"gocv.io/x/gocv"
 )
 
+
 type EngineInitRequest struct {
 	ModelPath   string   `json:"modelName" binding:"required"`
 	Names       []string `json:"names" binding:"required"`
@@ -25,6 +26,7 @@ type EngineInitRequest struct {
 	Iou         float32  `json:"iou"`
 	UseGPU      bool     `json:"useGPU"`
 	Description string   `json:"description"`
+
 }
 
 type WorkerID struct {
