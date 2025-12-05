@@ -4,13 +4,11 @@ import (
 	"OnnxDetServer/engine"
 	"encoding/base64"
 	"errors"
-	"strings"
-
-	//"encoding/base64"
-	//"errors"
 	"fmt"
+	"maps"
 	"net/http"
-	//"strings"
+	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -27,20 +25,19 @@ type EngineInitRequest struct {
 	Description string   `json:"description"`
 }
 
-type InferenceRequest struct {
-	UUID  string `json:"uuid" binding:"required"`
-	Image byte   `json:"image" binding:"required"`
-}
-
-type detectorIdentify struct {
+type WorkerID struct {
 	detector    *engine.Detector
 	Description string
 	EngineType  int
 }
 
-var dSequences map[string]detectorIdentify
+var (
+	dSequences map[string]WorkerID
+	seqMu      sync.Mutex
+	mapMu      sync.RWMutex
+)
 
-func (d *detectorIdentify) add2Seq(detector *engine.Detector, description string, engineType int) string {
+func (d *WorkerID) add2Seq(detector *engine.Detector, description string, engineType int) string {
 	d.detector = detector
 	d.Description = description
 	if engineType == engine.MultiThread {
@@ -48,9 +45,8 @@ func (d *detectorIdentify) add2Seq(detector *engine.Detector, description string
 	}
 	d.EngineType = engineType
 	if dSequences == nil {
-		dSequences = make(map[string]detectorIdentify)
+		dSequences = make(map[string]WorkerID)
 	}
-	// Generate a unique ID for the sequence
 	UUID := uuid.New().String()
 	dSequences[UUID] = *d
 	return UUID
@@ -80,7 +76,41 @@ func Base64ToMat(b64 string) (gocv.Mat, error) {
 	return mat, nil
 }
 
+type jobPackage struct {
+	worker *engine.Detector
+	image  string
+	Result chan jobResult
+}
+
+type jobResult struct {
+	Data engine.RetData
+}
+
+var jobQueue = make(chan jobPackage, 4)
+
+func startWorker(workerNum int) {
+	for i := 0; i < workerNum; i++ {
+		go func(workerID int) {
+			fmt.Printf("Worker %d started\n", workerID)
+			for job := range jobQueue {
+				detector := job.worker
+				image := job.image
+				imgData, err := Base64ToMat(image)
+				if err != nil {
+					job.Result <- jobResult{Data: engine.RetData{}}
+				} else {
+					result := detector.Detect(imgData)
+					job.Result <- jobResult{Data: result}
+				}
+				err = imgData.Close()
+			}
+			fmt.Printf("Worker %d finished\n", workerID)
+		}(i)
+	}
+}
+
 func main() {
+	startWorker(4)
 	r := gin.Default()
 	r.GET("/api/Engine/init/:engineType", func(c *gin.Context) {
 		engineTypeStr := c.Param("engineType")
@@ -104,7 +134,7 @@ func main() {
 			req.Threads = 1 // 默认单线程
 		}
 		if req.Conf <= 0 {
-			req.Conf = 0.5 // 默认置信度
+			req.Conf = 0.3 // 默认置信度
 		}
 		if req.Iou <= 0 {
 			req.Iou = 0.5 // 默认IOU
@@ -112,18 +142,22 @@ func main() {
 		if req.Description == "" {
 			req.Description = "Default Detector"
 		}
+
 		detector := engine.Detector{}
 		detector.New()
 		names := engine.NamesConf{}
 		names.IsFile = false
 		names.Data = req.Names
+		seqMu.Lock()
 		detector.LoadModel(req.ModelPath, names, req.Conf, req.Iou, req.UseGPU)
-		seqdet := detectorIdentify{}
+		seqMu.Unlock()
+		seqdet := WorkerID{}
 		seqdet.EngineType = engineType
 		seqdet.Description = req.Description
 		seqdet.detector = &detector
+		mapMu.Lock()
 		Id := seqdet.add2Seq(&detector, req.Description, engineType)
-
+		mapMu.Unlock()
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Engine initialized successfully",
 			"data": gin.H{
@@ -135,7 +169,9 @@ func main() {
 	})
 	r.POST("/api/inference/:UUID", func(c *gin.Context) {
 		UUID := c.Param("UUID")
+		mapMu.Lock()
 		detector, exists := dSequences[UUID]
+		mapMu.Unlock()
 		if !exists {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
 			return
@@ -145,20 +181,14 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Image data is required"})
 			return
 		}
-		imgData, err := Base64ToMat(imageBase64)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to decode image: " + err.Error()})
-			return
+		inferResult := make(chan jobResult)
+		job := jobPackage{
+			image:  imageBase64,
+			worker: detector.detector,
+			Result: inferResult,
 		}
-		defer func(imgData *gocv.Mat) {
-			err := imgData.Close()
-			if err != nil {
-				fmt.Println("Failed to release image data:", err)
-			}
-		}(&imgData)
-
-		results := detector.detector.Detect(imgData)
-		fmt.Println(results)
+		jobQueue <- job
+		results := <-inferResult
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Inference completed successfully",
 			"data":    results,
@@ -166,21 +196,26 @@ func main() {
 	})
 	r.GET("/api/Engine/destroy/:UUID", func(c *gin.Context) {
 		UUID := c.Param("UUID")
+		mapMu.Lock()
 		detector, exists := dSequences[UUID]
+		mapMu.Unlock()
 		if !exists {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
 			return
 		}
 		detector.detector.Destroy()
+		mapMu.Lock()
 		delete(dSequences, UUID)
+		mapMu.Unlock()
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Detector destroyed successfully",
 		})
-		fmt.Println(dSequences)
 	})
 	r.GET("/api/Engine/check/:UUID", func(c *gin.Context) {
 		UUID := c.Param("UUID")
+		mapMu.Lock()
 		detector, exists := dSequences[UUID]
+		mapMu.Unlock()
 		if !exists {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
 			return
@@ -198,6 +233,12 @@ func main() {
 			"message": "Detector status retrieved successfully",
 			"data":    detectorState,
 		})
+	})
+	r.GET("/api/Engine/checkAll", func(c *gin.Context) {
+		mapMu.Lock()
+		allSeq := maps.Clone(dSequences)
+		mapMu.Unlock()
+		c.JSON(http.StatusOK, gin.H{"message": "All States", "data": allSeq})
 	})
 	err := r.Run(":8080")
 	if err != nil {
