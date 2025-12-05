@@ -45,11 +45,11 @@ func (d *WorkerID) add2Seq(detector *engine.Detector, description string, engine
 		panic("Multi-threading is not supported yet")
 	}
 	d.EngineType = engineType
-	if dSequences == nil {
-		dSequences = make(map[string]WorkerID)
-	}
 	UUID := uuid.New().String()
+	mapMu.Lock()
 	dSequences[UUID] = *d
+	mapMu.Unlock()
+	fmt.Printf("Detector %s added with ID %s\n", description, UUID)
 	return UUID
 }
 
@@ -112,6 +112,7 @@ func startWorker(workerNum int) {
 
 func main() {
 	startWorker(4)
+	dSequences = make(map[string]WorkerID)
 	r := gin.Default()
 	r.GET("/api/Engine/init/:engineType", func(c *gin.Context) {
 		engineTypeStr := c.Param("engineType")
@@ -183,6 +184,7 @@ func main() {
 			return
 		}
 		inferResult := make(chan jobResult)
+		defer close(inferResult)
 		job := jobPackage{
 			image:  imageBase64,
 			worker: detector.detector,
@@ -241,7 +243,7 @@ func main() {
 		mapMu.Unlock()
 		c.JSON(http.StatusOK, gin.H{"message": "All States", "data": allSeq})
 	})
-	r.GET("/api/Engine/shutdown", func(c *gin.Context) {
+	r.POST("/api/Engine/shutdown", func(c *gin.Context) {
 		mapMu.Lock()
 		for id, detector := range dSequences {
 			detector.detector.Destroy()
