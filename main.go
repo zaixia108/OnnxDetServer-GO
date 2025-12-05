@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
@@ -239,6 +240,25 @@ func main() {
 		allSeq := maps.Clone(dSequences)
 		mapMu.Unlock()
 		c.JSON(http.StatusOK, gin.H{"message": "All States", "data": allSeq})
+	})
+	r.GET("/api/Engine/shutdown", func(c *gin.Context) {
+		mapMu.Lock()
+		for id, detector := range dSequences {
+			detector.detector.Destroy()
+			delete(dSequences, id)
+		}
+		mapMu.Unlock()
+		//结束进程
+		c.JSON(http.StatusOK, gin.H{"message": "All detectors destroyed and server shutting down"})
+		fmt.Println("All detectors destroyed and server shutting down")
+		// 这里可以添加清理资源的代码
+		close(jobQueue) // 关闭工作队列
+		for range jobQueue {
+			// 等待所有工作完成
+		}
+		fmt.Println("Server shutdown complete")
+		// 退出程序
+		defer os.Exit(0)
 	})
 	err := r.Run(":8080")
 	if err != nil {
