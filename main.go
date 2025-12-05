@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -46,9 +47,7 @@ func (d *WorkerID) add2Seq(detector *engine.Detector, description string, engine
 	}
 	d.EngineType = engineType
 	UUID := uuid.New().String()
-	mapMu.Lock()
 	dSequences[UUID] = *d
-	mapMu.Unlock()
 	fmt.Printf("Detector %s added with ID %s\n", description, UUID)
 	return UUID
 }
@@ -171,9 +170,9 @@ func main() {
 	})
 	r.POST("/api/inference/:UUID", func(c *gin.Context) {
 		UUID := c.Param("UUID")
-		mapMu.Lock()
+		mapMu.RLock()
 		detector, exists := dSequences[UUID]
-		mapMu.Unlock()
+		mapMu.RUnlock()
 		if !exists {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
 			return
@@ -201,13 +200,12 @@ func main() {
 		UUID := c.Param("UUID")
 		mapMu.Lock()
 		detector, exists := dSequences[UUID]
-		mapMu.Unlock()
 		if !exists {
+			mapMu.Unlock()
 			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
 			return
 		}
 		detector.detector.Destroy()
-		mapMu.Lock()
 		delete(dSequences, UUID)
 		mapMu.Unlock()
 		c.JSON(http.StatusOK, gin.H{
@@ -244,23 +242,19 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "All States", "data": allSeq})
 	})
 	r.POST("/api/Engine/shutdown", func(c *gin.Context) {
-		mapMu.Lock()
-		for id, detector := range dSequences {
-			detector.detector.Destroy()
-			delete(dSequences, id)
-		}
-		mapMu.Unlock()
-		//结束进程
-		c.JSON(http.StatusOK, gin.H{"message": "All detectors destroyed and server shutting down"})
-		fmt.Println("All detectors destroyed and server shutting down")
-		// 这里可以添加清理资源的代码
-		close(jobQueue) // 关闭工作队列
-		for range jobQueue {
-			// 等待所有工作完成
-		}
-		fmt.Println("Server shutdown complete")
-		// 退出程序
-		defer os.Exit(0)
+		c.JSON(http.StatusOK, gin.H{"message": "Shutting down..."})
+		go func() {
+			mapMu.Lock()
+			for id, detector := range dSequences {
+				detector.detector.Destroy()
+				delete(dSequences, id)
+			}
+			mapMu.Unlock()
+			close(jobQueue)
+			fmt.Println("Server shutting down in 1 second...")
+			time.Sleep(1 * time.Second)
+			os.Exit(0)
+		}()
 	})
 	err := r.Run(":8080")
 	if err != nil {
