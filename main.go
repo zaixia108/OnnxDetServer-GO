@@ -5,9 +5,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -15,8 +18,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gocv.io/x/gocv"
+	"gopkg.in/yaml.v3"
 )
-
 
 type EngineInitRequest struct {
 	ModelPath   string   `json:"modelName" binding:"required"`
@@ -26,7 +29,11 @@ type EngineInitRequest struct {
 	Iou         float32  `json:"iou"`
 	UseGPU      bool     `json:"useGPU"`
 	Description string   `json:"description"`
+}
 
+type configStruct struct {
+	Port       int `yaml:"port"`
+	WorkersNum int `yaml:"workersNum"`
 }
 
 type WorkerID struct {
@@ -55,32 +62,49 @@ func (d *WorkerID) add2Seq(detector *engine.Detector, description string, engine
 }
 
 // Base64ToMat 将 base64 字符串（可带 data:image/... 前缀）转为 gocv.Mat
-func Base64ToMat(b64 string) (gocv.Mat, error) {
+func Base64ToMat(b64 any) (gocv.Mat, error) {
 	// 去掉可能的 data URL 前缀
-	if i := strings.Index(b64, ","); i != -1 && strings.HasPrefix(b64, "data:") {
-		b64 = b64[i+1:]
-	}
-
-	data, err := base64.StdEncoding.DecodeString(b64)
-	if err != nil {
-		return gocv.NewMat(), err
-	}
-
-	mat, _ := gocv.IMDecode(data, gocv.IMReadColor)
-	if mat.Empty() {
-		// IMDecode 返回空 Mat 表示解码失败
-		err := mat.Close()
-		if err != nil {
-			return gocv.Mat{}, err
+	switch b64.(type) {
+	case string:
+		b64 := b64.(string)
+		if i := strings.Index(b64, ","); i != -1 && strings.HasPrefix(b64, "data:") {
+			b64 = b64[i+1:]
 		}
-		return gocv.NewMat(), errors.New("decoded image is empty or unsupported format")
+
+		data, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			return gocv.NewMat(), err
+		}
+
+		mat, _ := gocv.IMDecode(data, gocv.IMReadColor)
+		if mat.Empty() {
+			// IMDecode 返回空 Mat 表示解码失败
+			err := mat.Close()
+			if err != nil {
+				return gocv.Mat{}, err
+			}
+			return gocv.NewMat(), errors.New("decoded image is empty or unsupported format")
+		}
+		return mat, nil
+	case []byte:
+		mat, _ := gocv.IMDecode(b64.([]byte), gocv.IMReadColor)
+		if mat.Empty() {
+			// IMDecode 返回空 Mat 表示解码失败
+			err := mat.Close()
+			if err != nil {
+				return gocv.Mat{}, err
+			}
+			return gocv.NewMat(), errors.New("decoded image is empty or unsupported format")
+		}
+		return mat, nil
+	default:
+		return gocv.NewMat(), errors.New("input must be a base64 string or byte slice")
 	}
-	return mat, nil
 }
 
 type jobPackage struct {
 	worker *engine.Detector
-	image  string
+	image  any
 	Result chan jobResult
 }
 
@@ -93,7 +117,9 @@ var jobQueue = make(chan jobPackage, 4)
 func startWorker(workerNum int) {
 	for i := 0; i < workerNum; i++ {
 		go func(workerID int) {
-			fmt.Printf("Worker %d started\n", workerID)
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+			fmt.Printf("---Worker %d created\n", workerID)
 			for job := range jobQueue {
 				detector := job.worker
 				image := job.image
@@ -106,15 +132,52 @@ func startWorker(workerNum int) {
 				}
 				err = imgData.Close()
 			}
-			fmt.Printf("Worker %d finished\n", workerID)
 		}(i)
 	}
 }
 
 func main() {
-	startWorker(4)
+	gin.SetMode(gin.ReleaseMode)
+	fmt.Println(strings.Repeat("#", 64))
+	CPUNum := runtime.NumCPU()
+	runtime.GOMAXPROCS(CPUNum)
+	fmt.Printf("CPU Cores: %d\n", CPUNum)
+	configData, err := os.ReadFile("config.yaml")
+	if err != nil {
+		fmt.Println("Failed to read config file:", err)
+		return
+	}
+	config := configStruct{}
+	err = yaml.Unmarshal(configData, &config)
+	if err != nil {
+		fmt.Println("Failed to parse config file:", err)
+		return
+	}
+	fmt.Println("Server Port:", config.Port)
+	fmt.Println("Configured Workers Num:", config.WorkersNum)
+	fmt.Println(strings.Repeat("#", 64))
+	fmt.Println("")
+	if config.WorkersNum <= 0 {
+		config.WorkersNum = 1
+		fmt.Println(strings.Repeat("!", 64))
+		fmt.Println("Invalid workersNum in config, defaulting to 1")
+		fmt.Println(strings.Repeat("!", 64))
+	} else if config.WorkersNum > CPUNum {
+		fmt.Println(strings.Repeat("!", 64))
+		fmt.Println("Please noted that workersNum exceeds CPU cores, which may lead to performance degradation.")
+		fmt.Println(strings.Repeat("!", 64))
+	}
+	fmt.Println("")
+	fmt.Println(strings.Repeat("#", 64))
+	fmt.Println("If you need GPU acceleration, please make sure that your GPU has enough memory to handle multiple workers.")
+	fmt.Println("for GPU memory usage, please refer to 1280*1280 Yolo v8s model requires about 0.5GB memory each.")
+	fmt.Println(strings.Repeat("#", 64))
+	fmt.Println("")
+	startWorker(config.WorkersNum)
+	jobQueue = make(chan jobPackage, config.WorkersNum)
 	dSequences = make(map[string]WorkerID)
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
 	r.GET("/api/Engine/init/:engineType", func(c *gin.Context) {
 		engineTypeStr := c.Param("engineType")
 		var engineType int
@@ -198,6 +261,54 @@ func main() {
 			"data":    results,
 		})
 	})
+	r.POST("/api/inference/modern/:UUID", func(c *gin.Context) {
+		UUID := c.Param("UUID")
+		mapMu.RLock()
+		detector, exists := dSequences[UUID]
+		mapMu.RUnlock()
+		if !exists {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Detector not found"})
+			return
+		}
+		fileHeader, err := c.FormFile("image")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Image file is required"})
+			fmt.Println(err.Error())
+			return
+		}
+		file, err := fileHeader.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image file"})
+			return
+		}
+		defer func(file multipart.File) {
+			err := file.Close()
+			if err != nil {
+
+			}
+		}(file)
+		limitedReader := io.LimitReader(file, 10*1024*1024)
+		fileByte, err := io.ReadAll(limitedReader)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read image file"})
+			return
+		}
+		inferResult := make(chan jobResult)
+		defer close(inferResult)
+		job := jobPackage{
+			image:  fileByte,
+			worker: detector.detector,
+			Result: inferResult,
+		}
+		jobQueue <- job
+		results := <-inferResult
+		//fmt.Println(results.Data.Data)
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Inference completed successfully",
+			"data":    results.Data.Data,
+		})
+
+	})
 	r.GET("/api/Engine/destroy/:UUID", func(c *gin.Context) {
 		UUID := c.Param("UUID")
 		mapMu.Lock()
@@ -238,9 +349,9 @@ func main() {
 		})
 	})
 	r.GET("/api/Engine/checkAll", func(c *gin.Context) {
-		mapMu.Lock()
+		mapMu.RLock()
 		allSeq := maps.Clone(dSequences)
-		mapMu.Unlock()
+		mapMu.RUnlock()
 		c.JSON(http.StatusOK, gin.H{"message": "All States", "data": allSeq})
 	})
 	r.POST("/api/Engine/shutdown", func(c *gin.Context) {
@@ -258,7 +369,8 @@ func main() {
 			os.Exit(0)
 		}()
 	})
-	err := r.Run(":8080")
+	addr := fmt.Sprintf(":%d", config.Port)
+	err = r.Run(addr)
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -29,9 +29,9 @@ type Box struct {
 }
 
 type result struct {
-	conf   float32
-	box    Box
-	center Position
+	Conf   float32
+	Box    Box
+	Center Position
 }
 
 func ReadLinesReadFile(path string) ([]string, error) {
@@ -153,9 +153,9 @@ func (d *Detector) Detect(img gocv.Mat) RetData {
 			Y: (box.LT.Y + box.RB.Y) / 2,
 		}
 		res := result{
-			conf:   conf,
-			box:    box,
-			center: center,
+			Conf:   conf,
+			Box:    box,
+			Center: center,
 		}
 		className := d.Names[classIdx]
 		resultDict[className] = append(resultDict[className], res)
