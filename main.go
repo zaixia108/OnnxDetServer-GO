@@ -2,6 +2,7 @@ package main
 
 import (
 	"OnnxDetServer/engine"
+	iface "OnnxDetServer/interface"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -36,8 +37,15 @@ type configStruct struct {
 	WorkersNum int `yaml:"workersNum"`
 }
 
+type backend interface {
+	LoadModel(modelPath string, names iface.NamesConf, conf float32, iou float32, useGPU bool) bool
+	Detect(image gocv.Mat) iface.RetData
+	Destroy()
+	CheckConfig() iface.EngineConfig
+}
+
 type WorkerID struct {
-	detector    *engine.Detector
+	detector    backend
 	Description string
 	EngineType  int
 }
@@ -103,36 +111,49 @@ func Base64ToMat(b64 any) (gocv.Mat, error) {
 }
 
 type jobPackage struct {
-	worker *engine.Detector
+	worker backend
 	image  any
 	Result chan jobResult
 }
 
 type jobResult struct {
-	Data engine.RetData
+	Data iface.RetData
 }
 
-var jobQueue = make(chan jobPackage, 4)
+var jobQueue chan jobPackage
 
 func startWorker(workerNum int) {
 	for i := 0; i < workerNum; i++ {
-		go func(workerID int) {
-			runtime.LockOSThread()
-			defer runtime.UnlockOSThread()
-			fmt.Printf("---Worker %d created\n", workerID)
-			for job := range jobQueue {
-				detector := job.worker
-				image := job.image
-				imgData, err := Base64ToMat(image)
-				if err != nil {
-					job.Result <- jobResult{Data: engine.RetData{}}
-				} else {
-					result := detector.Detect(imgData)
-					job.Result <- jobResult{Data: result}
-				}
-				err = imgData.Close()
-			}
-		}(i)
+		go runWorker(i)
+	}
+}
+
+func runWorker(workerID int) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Worker %d panic: %v. Restarting in 1s...\n", workerID, r)
+			//重启这个 Worker
+			time.Sleep(1 * time.Second)
+			go runWorker(workerID)
+		}
+	}()
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	fmt.Printf("---Worker %d created\n", workerID)
+	for job := range jobQueue {
+		detector := job.worker
+		image := job.image
+		imgData, err := Base64ToMat(image)
+		if err != nil {
+			job.Result <- jobResult{Data: iface.RetData{}}
+		} else {
+			result := detector.Detect(imgData)
+			job.Result <- jobResult{Data: result}
+		}
+		err = imgData.Close()
+		if err != nil {
+			fmt.Printf("⚠️ Worker %d: error closing imgData: %v\n", workerID, err)
+		}
 	}
 }
 
@@ -173,8 +194,8 @@ func main() {
 	fmt.Println("for GPU memory usage, please refer to 1280*1280 Yolo v8s model requires about 0.5GB memory each.")
 	fmt.Println(strings.Repeat("#", 64))
 	fmt.Println("")
-	startWorker(config.WorkersNum)
 	jobQueue = make(chan jobPackage, config.WorkersNum)
+	startWorker(config.WorkersNum)
 	dSequences = make(map[string]WorkerID)
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -211,7 +232,7 @@ func main() {
 
 		detector := engine.Detector{}
 		detector.New()
-		names := engine.NamesConf{}
+		names := iface.NamesConf{}
 		names.IsFile = false
 		names.Data = req.Names
 		seqMu.Lock()
@@ -336,13 +357,13 @@ func main() {
 		}
 		var detectorState map[string]any
 		detectorState = make(map[string]any)
+		engineConfig := detector.detector.CheckConfig()
 		detectorState["description"] = detector.Description
 		detectorState["engineType"] = detector.EngineType
-		detectorState["modelPath"] = detector.detector.ModelPath
-		detectorState["conf"] = detector.detector.Conf
-		detectorState["iou"] = detector.detector.Iou
-		detectorState["useGPU"] = detector.detector.UseGPU
-		detectorState["state"] = detector.detector.State
+		detectorState["modelPath"] = engineConfig.ModelPath
+		detectorState["conf"] = engineConfig.Conf
+		detectorState["iou"] = engineConfig.Iou
+		detectorState["useGPU"] = engineConfig.UseGPU
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Detector status retrieved successfully",
 			"data":    detectorState,

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	iface "OnnxDetServer/interface"
 	"os"
 	"reflect"
 	"strings"
@@ -71,12 +72,16 @@ func (d *Detector) New() bool {
 	return d.Instance != nil
 }
 
-type NamesConf struct {
-	IsFile bool
-	Data   any
+func (d *Detector) CheckConfig() iface.EngineConfig {
+	retConfig := iface.EngineConfig{}
+	retConfig.ModelPath = d.ModelPath
+	retConfig.Conf = d.Conf
+	retConfig.Iou = d.Iou
+	retConfig.UseGPU = d.UseGPU
+	return retConfig
 }
 
-func (d *Detector) LoadModel(modelPath string, names NamesConf, conf float32, iou float32, useGPU bool) bool {
+func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float32, iou float32, useGPU bool) bool {
 	if names.IsFile {
 		d.Names, _ = ReadLinesReadFile(names.Data.(string))
 	} else {
@@ -110,19 +115,14 @@ func (d *Detector) Destroy() {
 	d.State = UNREGISTERED
 }
 
-type RetData struct {
-	Success bool
-	Data    any
-}
-
-func (d *Detector) Detect(img gocv.Mat) RetData {
+func (d *Detector) Detect(img gocv.Mat) iface.RetData {
 	switch d.State {
 	case UNREGISTERED:
-		return RetData{Success: false, Data: "Detector not registered"}
+		return iface.RetData{Success: false, Data: "Detector not registered"}
 	case REGISTERED:
-		return RetData{Success: false, Data: "Model not loaded"}
+		return iface.RetData{Success: false, Data: "Model not loaded"}
 	case BUSY:
-		return RetData{Success: false, Data: "Detector is busy"}
+		return iface.RetData{Success: false, Data: "Detector is busy"}
 	}
 	d.State = BUSY
 	imgData := img.ToBytes()
@@ -133,7 +133,7 @@ func (d *Detector) Detect(img gocv.Mat) RetData {
 	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, width, height, channels)
 	if !ok {
 		d.State = IDLE
-		return RetData{Success: false, Data: "Detection failed"}
+		return iface.RetData{Success: false, Data: "Detection failed"}
 	}
 	resultDict := make(map[string][]result)
 	for item := range d.Names {
@@ -161,5 +161,5 @@ func (d *Detector) Detect(img gocv.Mat) RetData {
 		resultDict[className] = append(resultDict[className], res)
 	}
 	d.State = IDLE
-	return RetData{Success: true, Data: resultDict}
+	return iface.RetData{Success: true, Data: resultDict}
 }
