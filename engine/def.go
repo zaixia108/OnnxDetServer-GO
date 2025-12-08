@@ -14,7 +14,6 @@ const UNREGISTERED = 0x0001
 const REGISTERED = 0x0002
 const IDLE = 0x0003
 const BUSY = 0x0004
-const ERROR = 0x0005
 const SingleThread = 0x1001
 const MultiThread = 0x1002
 

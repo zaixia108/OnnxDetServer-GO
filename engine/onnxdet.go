@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -14,7 +15,7 @@ var deps = []string{
 }
 
 func loadOnnxWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
-	missing := []string{}
+	var missing []string
 	for _, d := range deps {
 		p := filepath.Join(dllDir, d)
 		if _, err := os.Stat(p); err != nil {
@@ -39,7 +40,7 @@ func loadOnnxWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
 	if ret == 0 {
 		old := os.Getenv("PATH")
 		_ = os.Setenv("PATH", dllDir+";"+old)
-		if callErr != nil && callErr != syscall.Errno(0) {
+		if callErr != nil && !errors.Is(callErr, syscall.Errno(0)) {
 			return nil, fmt.Errorf("SetDllDirectoryW failed: %v", callErr)
 		}
 	}
@@ -47,7 +48,7 @@ func loadOnnxWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
 	dllPath := filepath.Join(dllDir, dllName)
 	mod := syscall.NewLazyDLL(dllPath)
 	if err := mod.Load(); err != nil {
-		return nil, fmt.Errorf("Load %s failed: %w", dllPath, err)
+		return nil, fmt.Errorf("load %s failed: %w", dllPath, err)
 	}
 	return mod, nil
 }

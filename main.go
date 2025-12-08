@@ -197,8 +197,10 @@ func main() {
 	jobQueue = make(chan jobPackage, config.WorkersNum)
 	startWorker(config.WorkersNum)
 	dSequences = make(map[string]WorkerID)
+
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+
 	r.GET("/api/Engine/init/:engineType", func(c *gin.Context) {
 		engineTypeStr := c.Param("engineType")
 		var engineType int
