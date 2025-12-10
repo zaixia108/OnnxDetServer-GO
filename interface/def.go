@@ -17,3 +17,20 @@ type EngineConfig struct {
 	Conf      float32
 	Iou       float32
 }
+
+type Position struct {
+	X, Y float32
+}
+
+type Box struct {
+	LT Position
+	RT Position
+	RB Position
+	LB Position
+}
+
+type Result struct {
+	Conf   float32
+	Box    Box
+	Center Position
+}
