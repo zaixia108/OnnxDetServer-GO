@@ -300,7 +300,7 @@ func (s *server) CheckEngine(ctx context.Context, req *pb.CheckEngineRequest) (*
 		return nil, fmt.Errorf("detector with ID %s not found", UUID)
 	}
 	Dconfig := detector.detector.CheckConfig()
-	names := make([]string, 0, len(Dconfig.Names.Data.([]string)))
+	names := make([]string, 0)
 	switch Dconfig.Names.Data.(type) {
 	case []string:
 		names = Dconfig.Names.Data.([]string)
