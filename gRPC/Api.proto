@@ -27,7 +27,6 @@ message SingleResult {
     Position center = 4;
 }
 
-// 1. 修改这里：加 Request 后缀
 message InitEngineRequest {
     int32 engine_type = 1;
     string model_path = 2;
@@ -44,7 +43,6 @@ message InitEngineResponse{
     string message = 3;
 }
 
-// 2. 修改这里：加 Request 后缀
 message InferenceRequest {
     string id = 1;
     bytes img_data = 2;
@@ -55,7 +53,6 @@ message InferenceResponse{
     repeated SingleResult results = 2;
 }
 
-// 3. 修改这里：加 Request 后缀
 message DestroyEngineRequest {
     string id = 1;
 }
@@ -65,7 +62,6 @@ message DestroyEngineResponse{
     string message = 2;
 }
 
-// 4. 修改这里：加 Request 后缀
 message CheckEngineRequest {
     string id = 1;
 }
@@ -83,18 +79,11 @@ message CheckAllEngineResponse{
 }
 
 service DetectService {
-    // 5. 修改这里：参数引用新的 Request 名字
+
     rpc InitEngine(InitEngineRequest) returns (InitEngineResponse);
-
-    // 6. 修改这里
     rpc Inference(InferenceRequest) returns (InferenceResponse);
-
-    // 7. 修改这里
     rpc DestroyEngine(DestroyEngineRequest) returns (DestroyEngineResponse);
-
-    // 8. 修改这里
     rpc CheckEngine(CheckEngineRequest) returns (CheckEngineResponse);
-
     rpc CheckAllEngine(google.protobuf.Empty) returns (CheckAllEngineResponse);
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
