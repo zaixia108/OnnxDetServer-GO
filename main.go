@@ -20,6 +20,8 @@ type configStruct struct {
 	AdhocPort     int    `yaml:"AdhocPort"`
 	WorkersNum    int    `yaml:"workersNum"`
 	InstanceClass string `yaml:"instanceClass"`
+	RegServerPort int    `yaml:"RegServerPort"`
+	RegServerHost string `yaml:"RegServerHost"`
 }
 
 func GetOutboundIP() (string, error) {
@@ -99,6 +101,8 @@ func main() {
 		fmt.Println("Invalid instanceClass in config, defaulting to Cpu")
 		InstanceClass = adhoc.CpuInstance
 	}
+	adhoc.RegServerCfg = adhoc.RegServerConfig{}
+	adhoc.RegServerCfg.SetAddress(config.RegServerHost, config.RegServerPort)
 	backend.JobQueue = make(chan backend.JobPackage, config.WorkersNum)
 	backend.StartWorker(config.WorkersNum)
 	backend.DSequences = make(map[string]backend.WorkerID)

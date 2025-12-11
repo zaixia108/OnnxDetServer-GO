@@ -33,9 +33,20 @@ type RegisterResponse struct {
 	Success bool   `json:"success"`
 }
 
-const RegisterServer = "127.0.0.1:50123"
+type RegServerConfig struct {
+	Port int
+	Addr string
+}
+
+func (reg *RegServerConfig) SetAddress(addr string, port int) {
+	reg.Addr = addr
+	reg.Port = port
+}
+
+var RegServerCfg RegServerConfig
 
 func SendAliveMessage(CCIP string, CCPort int, instanceClass int, ctx context.Context, wg *sync.WaitGroup) {
+	addr := fmt.Sprintf("%s:%d", RegServerCfg.Addr, RegServerCfg.Port)
 	defer wg.Done()
 	ticker := time.NewTicker(TimeOutSeconds * time.Second)
 	defer ticker.Stop()
@@ -51,7 +62,7 @@ func SendAliveMessage(CCIP string, CCPort int, instanceClass int, ctx context.Co
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		var respBody RegisterResponse
-		url := fmt.Sprintf("http://%s/api/register", RegisterServer)
+		url := fmt.Sprintf("http://%s/api/register", addr)
 		reqBody := RegisterRequest{
 			Id:            id,
 			IP:            CCIP,
@@ -74,7 +85,7 @@ func SendAliveMessage(CCIP string, CCPort int, instanceClass int, ctx context.Co
 		}
 		time.Sleep(time.Duration(TimeOutSeconds) * time.Second)
 	}
-
+	safeDoRequest()
 	for {
 		select {
 		case <-ctx.Done():
