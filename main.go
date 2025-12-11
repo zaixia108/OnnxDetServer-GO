@@ -107,11 +107,12 @@ func main() {
 	wg.Add(1)
 	go adhoc.SendAliveMessage(ip, config.RPCPort, InstanceClass, ctx, &wg)
 	//gRPC server setup
-	server := backend.StartGRPCServer(config.RPCPort)
 	fmt.Println("Starting gRPC Server")
+	server := backend.StartGRPCServer(config.RPCPort)
 	<-backend.CloseChannel
 	cancel()
-	wg.Wait()
 	server.GracefulStop()
-	fmt.Println("")
+	fmt.Println("Done")
+	wg.Wait()
+	fmt.Println("Safely exited")
 }

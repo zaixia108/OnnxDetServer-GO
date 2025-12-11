@@ -50,31 +50,29 @@ func SendAliveMessage(CCIP string, CCPort int, instanceClass int, ctx context.Co
 		}()
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
-		for i := uint(0); i >= 0; i++ {
-			var respBody RegisterResponse
-			url := fmt.Sprintf("http://%s/api/register", RegisterServer)
-			reqBody := RegisterRequest{
-				Id:            id,
-				IP:            CCIP,
-				Port:          CCPort,
-				InstanceClass: instanceClass,
-				TimeStamp:     time.Now().Unix(),
-			}
-			resp, err := client.R().
-				SetContext(ctx).
-				SetHeader("Content-Type", "application/json").
-				SetBody(reqBody).     // 可以直接传 struct，resty 会 JSON 编码
-				SetResult(&respBody). // 2xx 自动反序列化到 respBody
-				Post(url)
-			if err != nil {
-				logger.Log().Error(fmt.Sprintf("request error: %v", err))
-			}
-			// 检查 HTTP 状态码
-			if resp.IsError() {
-				logger.Log().Error(fmt.Sprintf("server returned error: %s, body: %s", resp.Status(), resp.String()))
-			}
-			time.Sleep(time.Duration(TimeOutSeconds) * time.Second)
+		var respBody RegisterResponse
+		url := fmt.Sprintf("http://%s/api/register", RegisterServer)
+		reqBody := RegisterRequest{
+			Id:            id,
+			IP:            CCIP,
+			Port:          CCPort,
+			InstanceClass: instanceClass,
+			TimeStamp:     time.Now().Unix(),
 		}
+		resp, err := client.R().
+			SetContext(ctx).
+			SetHeader("Content-Type", "application/json").
+			SetBody(reqBody).     // 可以直接传 struct，resty 会 JSON 编码
+			SetResult(&respBody). // 2xx 自动反序列化到 respBody
+			Post(url)
+		if err != nil {
+			logger.Log().Error(fmt.Sprintf("request error: %v", err))
+		}
+		// 检查 HTTP 状态码
+		if resp.IsError() {
+			logger.Log().Error(fmt.Sprintf("server returned error: %s, body: %s", resp.Status(), resp.String()))
+		}
+		time.Sleep(time.Duration(TimeOutSeconds) * time.Second)
 	}
 
 	for {

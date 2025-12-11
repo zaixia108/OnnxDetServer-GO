@@ -76,6 +76,8 @@ var JobQueue chan JobPackage
 
 var CloseChannel chan bool
 
+//var ServChan chan *grpc.Server
+
 func StartWorker(workerNum int) {
 	for i := 0; i < workerNum; i++ {
 		go runWorker(i)
@@ -330,22 +332,27 @@ func (s *Server) Shutdown(ctx context.Context, req *emptypb.Empty) (*emptypb.Emp
 		fmt.Println("Server shutting down in 1 second...")
 		time.Sleep(1 * time.Second)
 	}()
-	logger.Log().Warn("Shutting down in 1 second...")
 	CloseChannel <- true
+	logger.Log().Warn("Shutting down in 1 second...")
+	close(CloseChannel)
 	return &emptypb.Empty{}, nil
 }
 
 func StartGRPCServer(addr int) *grpc.Server {
+	CloseChannel = make(chan bool)
+	//ServChan = make(chan *grpc.Server)
 	port := fmt.Sprintf(":%d", addr)
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		fmt.Printf("Failed to listen on port %s: %v\n", port, err)
 	}
 	s := grpc.NewServer()
-	RegisterDetectServiceServer(s, &Server{})
-	log.Printf("server listening on port %s\n", port)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve gRPC server: %v", err)
-	}
+	go func() {
+		RegisterDetectServiceServer(s, &Server{})
+		log.Printf("server listening on port %s\n", port)
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve gRPC server: %v", err)
+		}
+	}()
 	return s
 }
