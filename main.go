@@ -105,10 +105,10 @@ func main() {
 	//Adhoc server setup
 	ctx, cancel := context.WithCancel(context.Background())
 	wg.Add(1)
-	go adhoc.SendAliveMessage(ip, config.AdhocPort, InstanceClass, ctx, &wg)
+	go adhoc.SendAliveMessage(ip, config.RPCPort, InstanceClass, ctx, &wg)
 	//gRPC server setup
 	server := backend.StartGRPCServer(config.RPCPort)
-
+	fmt.Println("Starting gRPC Server")
 	<-backend.CloseChannel
 	cancel()
 	wg.Wait()
