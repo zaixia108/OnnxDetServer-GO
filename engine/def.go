@@ -17,23 +17,6 @@ const BUSY = 0x0004
 const SingleThread = 0x1001
 const MultiThread = 0x1002
 
-type Position struct {
-	X, Y float32
-}
-
-type Box struct {
-	LT Position
-	RT Position
-	RB Position
-	LB Position
-}
-
-type result struct {
-	Conf   float32
-	Box    Box
-	Center Position
-}
-
 func ReadLinesReadFile(path string) ([]string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -77,6 +60,10 @@ func (d *Detector) CheckConfig() iface.EngineConfig {
 	retConfig.Conf = d.Conf
 	retConfig.Iou = d.Iou
 	retConfig.UseGPU = d.UseGPU
+	retConfig.Names = iface.NamesConf{
+		IsFile: false,
+		Data:   d.Names,
+	}
 	return retConfig
 }
 
@@ -134,24 +121,24 @@ func (d *Detector) Detect(img gocv.Mat) iface.RetData {
 		d.State = IDLE
 		return iface.RetData{Success: false, Data: "Detection failed"}
 	}
-	resultDict := make(map[string][]result)
+	resultDict := make(map[string][]iface.Result)
 	for item := range d.Names {
-		resultDict[d.Names[item]] = []result{}
+		resultDict[d.Names[item]] = []iface.Result{}
 	}
 	for i := 0; i < len(classes); i++ {
 		classIdx := int(classes[i])
 		conf := scores[i]
-		box := Box{
-			LT: Position{X: boxes[i*4], Y: boxes[i*4+1]},
-			RT: Position{X: boxes[i*4+2], Y: boxes[i*4+1]},
-			RB: Position{X: boxes[i*4+2], Y: boxes[i*4+3]},
-			LB: Position{X: boxes[i*4], Y: boxes[i*4+3]},
+		box := iface.Box{
+			LT: iface.Position{X: boxes[i*4], Y: boxes[i*4+1]},
+			RT: iface.Position{X: boxes[i*4+2], Y: boxes[i*4+1]},
+			RB: iface.Position{X: boxes[i*4+2], Y: boxes[i*4+3]},
+			LB: iface.Position{X: boxes[i*4], Y: boxes[i*4+3]},
 		}
-		center := Position{
+		center := iface.Position{
 			X: (box.LT.X + box.RB.X) / 2,
 			Y: (box.LT.Y + box.RB.Y) / 2,
 		}
-		res := result{
+		res := iface.Result{
 			Conf:   conf,
 			Box:    box,
 			Center: center,
