@@ -26,22 +26,20 @@ const (
 	DetectService_CheckEngine_FullMethodName    = "/proto.DetectService/CheckEngine"
 	DetectService_CheckAllEngine_FullMethodName = "/proto.DetectService/CheckAllEngine"
 	DetectService_Shutdown_FullMethodName       = "/proto.DetectService/Shutdown"
+	DetectService_UploadModel_FullMethodName    = "/proto.DetectService/UploadModel"
 )
 
 // DetectServiceClient is the client API for DetectService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DetectServiceClient interface {
-	// 5. 修改这里：参数引用新的 Request 名字
 	InitEngine(ctx context.Context, in *InitEngineRequest, opts ...grpc.CallOption) (*InitEngineResponse, error)
-	// 6. 修改这里
 	Inference(ctx context.Context, in *InferenceRequest, opts ...grpc.CallOption) (*InferenceResponse, error)
-	// 7. 修改这里
 	DestroyEngine(ctx context.Context, in *DestroyEngineRequest, opts ...grpc.CallOption) (*DestroyEngineResponse, error)
-	// 8. 修改这里
 	CheckEngine(ctx context.Context, in *CheckEngineRequest, opts ...grpc.CallOption) (*CheckEngineResponse, error)
 	CheckAllEngine(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CheckAllEngineResponse, error)
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	UploadModel(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadFileRequest, UploadFileResponse], error)
 }
 
 type detectServiceClient struct {
@@ -112,20 +110,30 @@ func (c *detectServiceClient) Shutdown(ctx context.Context, in *emptypb.Empty, o
 	return out, nil
 }
 
+func (c *detectServiceClient) UploadModel(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadFileRequest, UploadFileResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DetectService_ServiceDesc.Streams[0], DetectService_UploadModel_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UploadFileRequest, UploadFileResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DetectService_UploadModelClient = grpc.ClientStreamingClient[UploadFileRequest, UploadFileResponse]
+
 // DetectServiceServer is the server API for DetectService service.
 // All implementations must embed UnimplementedDetectServiceServer
 // for forward compatibility.
 type DetectServiceServer interface {
-	// 5. 修改这里：参数引用新的 Request 名字
 	InitEngine(context.Context, *InitEngineRequest) (*InitEngineResponse, error)
-	// 6. 修改这里
 	Inference(context.Context, *InferenceRequest) (*InferenceResponse, error)
-	// 7. 修改这里
 	DestroyEngine(context.Context, *DestroyEngineRequest) (*DestroyEngineResponse, error)
-	// 8. 修改这里
 	CheckEngine(context.Context, *CheckEngineRequest) (*CheckEngineResponse, error)
 	CheckAllEngine(context.Context, *emptypb.Empty) (*CheckAllEngineResponse, error)
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	UploadModel(grpc.ClientStreamingServer[UploadFileRequest, UploadFileResponse]) error
 	mustEmbedUnimplementedDetectServiceServer()
 }
 
@@ -153,6 +161,9 @@ func (UnimplementedDetectServiceServer) CheckAllEngine(context.Context, *emptypb
 }
 func (UnimplementedDetectServiceServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method Shutdown not implemented")
+}
+func (UnimplementedDetectServiceServer) UploadModel(grpc.ClientStreamingServer[UploadFileRequest, UploadFileResponse]) error {
+	return status.Error(codes.Unimplemented, "method UploadModel not implemented")
 }
 func (UnimplementedDetectServiceServer) mustEmbedUnimplementedDetectServiceServer() {}
 func (UnimplementedDetectServiceServer) testEmbeddedByValue()                       {}
@@ -283,6 +294,13 @@ func _DetectService_Shutdown_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DetectService_UploadModel_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DetectServiceServer).UploadModel(&grpc.GenericServerStream[UploadFileRequest, UploadFileResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DetectService_UploadModelServer = grpc.ClientStreamingServer[UploadFileRequest, UploadFileResponse]
+
 // DetectService_ServiceDesc is the grpc.ServiceDesc for DetectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -315,6 +333,12 @@ var DetectService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DetectService_Shutdown_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "UploadModel",
+			Handler:       _DetectService_UploadModel_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "Api.proto",
 }

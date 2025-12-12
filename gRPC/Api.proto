@@ -78,6 +78,25 @@ message CheckAllEngineResponse{
     string message = 3;
 }
 
+message FileInfo {
+    string name = 1;
+    int64 size = 2;
+    string file_type = 3;
+}
+
+message UploadFileRequest {
+    oneof data {
+        FileInfo file_info = 1;
+        bytes chunk_data = 2;
+    }
+}
+
+message UploadFileResponse {
+    bool success = 1;
+    string message = 2;
+    string file_path = 3;
+}
+
 service DetectService {
 
     rpc InitEngine(InitEngineRequest) returns (InitEngineResponse);
@@ -86,4 +105,7 @@ service DetectService {
     rpc CheckEngine(CheckEngineRequest) returns (CheckEngineResponse);
     rpc CheckAllEngine(google.protobuf.Empty) returns (CheckAllEngineResponse);
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+    rpc UploadModel(stream UploadFileRequest) returns (UploadFileResponse);
+
 }

@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"maps"
 	"net"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -336,6 +338,53 @@ func (s *Server) Shutdown(ctx context.Context, req *emptypb.Empty) (*emptypb.Emp
 	logger.Log().Warn("Shutting down in 1 second...")
 	close(CloseChannel)
 	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) UploadModel(stream DetectService_UploadModelServer) error {
+	var outFile *os.File
+	var fileSize int
+	var filePath string
+
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			if outFile != nil {
+				outFile.Close()
+			}
+			return stream.SendAndClose(&UploadFileResponse{
+				Success:  true,
+				Message:  "File uploaded successfully",
+				FilePath: filePath,
+			})
+		}
+		if err != nil {
+			return err
+		}
+
+		switch payload := req.Data.(type) {
+		case *UploadFileRequest_FileInfo:
+			fmt.Printf("Received UploadFileRequest_FileInfo: %+v\n", payload.FileInfo.Name)
+			saveDir := "models/"
+			fileName := payload.FileInfo.Name
+			if fileName == "" {
+				return fmt.Errorf("file name cannot be empty")
+			}
+			filePath = saveDir + fileName
+			outFile, err = os.Create(filePath)
+			if err != nil {
+				return err
+			}
+		case *UploadFileRequest_ChunkData:
+			if outFile == nil {
+				return fmt.Errorf("file not opened, please send file info first")
+			}
+			n, writeErr := outFile.Write(payload.ChunkData)
+			if writeErr != nil {
+				return fmt.Errorf("failed to write chunk data: %v", writeErr)
+			}
+			fileSize += n
+		}
+	}
 }
 
 func StartGRPCServer(addr int) *grpc.Server {

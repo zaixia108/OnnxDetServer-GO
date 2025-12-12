@@ -242,7 +242,6 @@ func (x *SingleResult) GetCenter() *Position {
 	return nil
 }
 
-// 1. 修改这里：加 Request 后缀
 type InitEngineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	EngineType    int32                  `protobuf:"varint,1,opt,name=engine_type,json=engineType,proto3" json:"engine_type,omitempty"`
@@ -395,7 +394,6 @@ func (x *InitEngineResponse) GetMessage() string {
 	return ""
 }
 
-// 2. 修改这里：加 Request 后缀
 type InferenceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -500,7 +498,6 @@ func (x *InferenceResponse) GetResults() []*SingleResult {
 	return nil
 }
 
-// 3. 修改这里：加 Request 后缀
 type DestroyEngineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -597,7 +594,6 @@ func (x *DestroyEngineResponse) GetMessage() string {
 	return ""
 }
 
-// 4. 修改这里：加 Request 后缀
 type CheckEngineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -762,6 +758,208 @@ func (x *CheckAllEngineResponse) GetMessage() string {
 	return ""
 }
 
+type FileInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Size          int64                  `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
+	FileType      string                 `protobuf:"bytes,3,opt,name=file_type,json=fileType,proto3" json:"file_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileInfo) Reset() {
+	*x = FileInfo{}
+	mi := &file_Api_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileInfo) ProtoMessage() {}
+
+func (x *FileInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_Api_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileInfo.ProtoReflect.Descriptor instead.
+func (*FileInfo) Descriptor() ([]byte, []int) {
+	return file_Api_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FileInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FileInfo) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *FileInfo) GetFileType() string {
+	if x != nil {
+		return x.FileType
+	}
+	return ""
+}
+
+type UploadFileRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Data:
+	//
+	//	*UploadFileRequest_FileInfo
+	//	*UploadFileRequest_ChunkData
+	Data          isUploadFileRequest_Data `protobuf_oneof:"data"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadFileRequest) Reset() {
+	*x = UploadFileRequest{}
+	mi := &file_Api_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadFileRequest) ProtoMessage() {}
+
+func (x *UploadFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_Api_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadFileRequest.ProtoReflect.Descriptor instead.
+func (*UploadFileRequest) Descriptor() ([]byte, []int) {
+	return file_Api_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *UploadFileRequest) GetData() isUploadFileRequest_Data {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *UploadFileRequest) GetFileInfo() *FileInfo {
+	if x != nil {
+		if x, ok := x.Data.(*UploadFileRequest_FileInfo); ok {
+			return x.FileInfo
+		}
+	}
+	return nil
+}
+
+func (x *UploadFileRequest) GetChunkData() []byte {
+	if x != nil {
+		if x, ok := x.Data.(*UploadFileRequest_ChunkData); ok {
+			return x.ChunkData
+		}
+	}
+	return nil
+}
+
+type isUploadFileRequest_Data interface {
+	isUploadFileRequest_Data()
+}
+
+type UploadFileRequest_FileInfo struct {
+	FileInfo *FileInfo `protobuf:"bytes,1,opt,name=file_info,json=fileInfo,proto3,oneof"`
+}
+
+type UploadFileRequest_ChunkData struct {
+	ChunkData []byte `protobuf:"bytes,2,opt,name=chunk_data,json=chunkData,proto3,oneof"`
+}
+
+func (*UploadFileRequest_FileInfo) isUploadFileRequest_Data() {}
+
+func (*UploadFileRequest_ChunkData) isUploadFileRequest_Data() {}
+
+type UploadFileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	FilePath      string                 `protobuf:"bytes,3,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadFileResponse) Reset() {
+	*x = UploadFileResponse{}
+	mi := &file_Api_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadFileResponse) ProtoMessage() {}
+
+func (x *UploadFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_Api_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadFileResponse.ProtoReflect.Descriptor instead.
+func (*UploadFileResponse) Descriptor() ([]byte, []int) {
+	return file_Api_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *UploadFileResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UploadFileResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *UploadFileResponse) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
 var File_Api_proto protoreflect.FileDescriptor
 
 const file_Api_proto_rawDesc = "" +
@@ -828,7 +1026,20 @@ const file_Api_proto_rawDesc = "" +
 	"\x16CheckAllEngineResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12+\n" +
 	"\aengines\x18\x02 \x03(\v2\x11.proto.EngineInfoR\aengines\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage2\xa9\x03\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"O\n" +
+	"\bFileInfo\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1b\n" +
+	"\tfile_type\x18\x03 \x01(\tR\bfileType\"l\n" +
+	"\x11UploadFileRequest\x12.\n" +
+	"\tfile_info\x18\x01 \x01(\v2\x0f.proto.FileInfoH\x00R\bfileInfo\x12\x1f\n" +
+	"\n" +
+	"chunk_data\x18\x02 \x01(\fH\x00R\tchunkDataB\x06\n" +
+	"\x04data\"e\n" +
+	"\x12UploadFileResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
+	"\tfile_path\x18\x03 \x01(\tR\bfilePath2\xef\x03\n" +
 	"\rDetectService\x12A\n" +
 	"\n" +
 	"InitEngine\x12\x18.proto.InitEngineRequest\x1a\x19.proto.InitEngineResponse\x12>\n" +
@@ -836,7 +1047,8 @@ const file_Api_proto_rawDesc = "" +
 	"\rDestroyEngine\x12\x1b.proto.DestroyEngineRequest\x1a\x1c.proto.DestroyEngineResponse\x12D\n" +
 	"\vCheckEngine\x12\x19.proto.CheckEngineRequest\x1a\x1a.proto.CheckEngineResponse\x12G\n" +
 	"\x0eCheckAllEngine\x12\x16.google.protobuf.Empty\x1a\x1d.proto.CheckAllEngineResponse\x12:\n" +
-	"\bShutdown\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB\n" +
+	"\bShutdown\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x12D\n" +
+	"\vUploadModel\x12\x18.proto.UploadFileRequest\x1a\x19.proto.UploadFileResponse(\x01B\n" +
 	"Z\b./;protob\x06proto3"
 
 var (
@@ -851,7 +1063,7 @@ func file_Api_proto_rawDescGZIP() []byte {
 	return file_Api_proto_rawDescData
 }
 
-var file_Api_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_Api_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_Api_proto_goTypes = []any{
 	(*EngineInfo)(nil),             // 0: proto.EngineInfo
 	(*Position)(nil),               // 1: proto.Position
@@ -865,7 +1077,10 @@ var file_Api_proto_goTypes = []any{
 	(*CheckEngineRequest)(nil),     // 9: proto.CheckEngineRequest
 	(*CheckEngineResponse)(nil),    // 10: proto.CheckEngineResponse
 	(*CheckAllEngineResponse)(nil), // 11: proto.CheckAllEngineResponse
-	(*emptypb.Empty)(nil),          // 12: google.protobuf.Empty
+	(*FileInfo)(nil),               // 12: proto.FileInfo
+	(*UploadFileRequest)(nil),      // 13: proto.UploadFileRequest
+	(*UploadFileResponse)(nil),     // 14: proto.UploadFileResponse
+	(*emptypb.Empty)(nil),          // 15: google.protobuf.Empty
 }
 var file_Api_proto_depIdxs = []int32{
 	1,  // 0: proto.SingleResult.box:type_name -> proto.Position
@@ -873,23 +1088,26 @@ var file_Api_proto_depIdxs = []int32{
 	2,  // 2: proto.InferenceResponse.results:type_name -> proto.SingleResult
 	0,  // 3: proto.CheckEngineResponse.engine_info:type_name -> proto.EngineInfo
 	0,  // 4: proto.CheckAllEngineResponse.engines:type_name -> proto.EngineInfo
-	3,  // 5: proto.DetectService.InitEngine:input_type -> proto.InitEngineRequest
-	5,  // 6: proto.DetectService.Inference:input_type -> proto.InferenceRequest
-	7,  // 7: proto.DetectService.DestroyEngine:input_type -> proto.DestroyEngineRequest
-	9,  // 8: proto.DetectService.CheckEngine:input_type -> proto.CheckEngineRequest
-	12, // 9: proto.DetectService.CheckAllEngine:input_type -> google.protobuf.Empty
-	12, // 10: proto.DetectService.Shutdown:input_type -> google.protobuf.Empty
-	4,  // 11: proto.DetectService.InitEngine:output_type -> proto.InitEngineResponse
-	6,  // 12: proto.DetectService.Inference:output_type -> proto.InferenceResponse
-	8,  // 13: proto.DetectService.DestroyEngine:output_type -> proto.DestroyEngineResponse
-	10, // 14: proto.DetectService.CheckEngine:output_type -> proto.CheckEngineResponse
-	11, // 15: proto.DetectService.CheckAllEngine:output_type -> proto.CheckAllEngineResponse
-	12, // 16: proto.DetectService.Shutdown:output_type -> google.protobuf.Empty
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	12, // 5: proto.UploadFileRequest.file_info:type_name -> proto.FileInfo
+	3,  // 6: proto.DetectService.InitEngine:input_type -> proto.InitEngineRequest
+	5,  // 7: proto.DetectService.Inference:input_type -> proto.InferenceRequest
+	7,  // 8: proto.DetectService.DestroyEngine:input_type -> proto.DestroyEngineRequest
+	9,  // 9: proto.DetectService.CheckEngine:input_type -> proto.CheckEngineRequest
+	15, // 10: proto.DetectService.CheckAllEngine:input_type -> google.protobuf.Empty
+	15, // 11: proto.DetectService.Shutdown:input_type -> google.protobuf.Empty
+	13, // 12: proto.DetectService.UploadModel:input_type -> proto.UploadFileRequest
+	4,  // 13: proto.DetectService.InitEngine:output_type -> proto.InitEngineResponse
+	6,  // 14: proto.DetectService.Inference:output_type -> proto.InferenceResponse
+	8,  // 15: proto.DetectService.DestroyEngine:output_type -> proto.DestroyEngineResponse
+	10, // 16: proto.DetectService.CheckEngine:output_type -> proto.CheckEngineResponse
+	11, // 17: proto.DetectService.CheckAllEngine:output_type -> proto.CheckAllEngineResponse
+	15, // 18: proto.DetectService.Shutdown:output_type -> google.protobuf.Empty
+	14, // 19: proto.DetectService.UploadModel:output_type -> proto.UploadFileResponse
+	13, // [13:20] is the sub-list for method output_type
+	6,  // [6:13] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_Api_proto_init() }
@@ -897,13 +1115,17 @@ func file_Api_proto_init() {
 	if File_Api_proto != nil {
 		return
 	}
+	file_Api_proto_msgTypes[13].OneofWrappers = []any{
+		(*UploadFileRequest_FileInfo)(nil),
+		(*UploadFileRequest_ChunkData)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_Api_proto_rawDesc), len(file_Api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

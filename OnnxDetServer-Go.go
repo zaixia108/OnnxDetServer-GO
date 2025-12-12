@@ -20,6 +20,7 @@ type configStruct struct {
 	AdhocPort     int    `yaml:"AdhocPort"`
 	WorkersNum    int    `yaml:"workersNum"`
 	InstanceClass string `yaml:"instanceClass"`
+	UseRegServer  bool   `yaml:"UseRegServer"`
 	RegServerPort int    `yaml:"RegServerPort"`
 	RegServerHost string `yaml:"RegServerHost"`
 }
@@ -109,7 +110,12 @@ func main() {
 	//Adhoc server setup
 	ctx, cancel := context.WithCancel(context.Background())
 	wg.Add(1)
-	go adhoc.SendAliveMessage(ip, config.RPCPort, InstanceClass, ctx, &wg)
+	if config.UseRegServer {
+		go adhoc.SendAliveMessage(ip, config.RPCPort, InstanceClass, ctx, &wg)
+	} else {
+		fmt.Println("UseRegServer is set to false, skipping registration")
+		wg.Done()
+	}
 	//gRPC server setup
 	fmt.Println("Starting gRPC Server")
 	server := backend.StartGRPCServer(config.RPCPort)
