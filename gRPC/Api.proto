@@ -1,0 +1,111 @@
+syntax = "proto3";
+package proto;
+option go_package = "./;proto";
+
+import "google/protobuf/empty.proto";
+
+message EngineInfo {
+    string id = 1;
+    string description = 2;
+    int32 engine_type = 3;
+    string model_path = 4;
+    repeated string names = 5;
+    float confidence = 6;
+    float iou = 7;
+    bool use_gpu = 8;
+}
+
+message Position {
+    int32 x = 1;
+    int32 y = 2;
+}
+
+message SingleResult {
+    string name = 1;
+    float confidence = 2;
+    repeated Position box = 3;
+    Position center = 4;
+}
+
+message InitEngineRequest {
+    int32 engine_type = 1;
+    string model_path = 2;
+    repeated string names = 3;
+    float confidence = 5;
+    float iou = 6;
+    bool use_gpu = 7;
+    string description = 8;
+}
+
+message InitEngineResponse{
+    bool success = 1;
+    string id = 2;
+    string message = 3;
+}
+
+message InferenceRequest {
+    string id = 1;
+    bytes img_data = 2;
+}
+
+message InferenceResponse{
+    bool success = 1;
+    repeated SingleResult results = 2;
+}
+
+message DestroyEngineRequest {
+    string id = 1;
+}
+
+message DestroyEngineResponse{
+    bool success = 1;
+    string message = 2;
+}
+
+message CheckEngineRequest {
+    string id = 1;
+}
+
+message CheckEngineResponse{
+    bool success = 1;
+    EngineInfo engine_info = 2;
+    string message = 3;
+}
+
+message CheckAllEngineResponse{
+    bool success = 1;
+    repeated EngineInfo engines = 2;
+    string message = 3;
+}
+
+message FileInfo {
+    string name = 1;
+    int64 size = 2;
+    string file_type = 3;
+}
+
+message UploadFileRequest {
+    oneof data {
+        FileInfo file_info = 1;
+        bytes chunk_data = 2;
+    }
+}
+
+message UploadFileResponse {
+    bool success = 1;
+    string message = 2;
+    string file_path = 3;
+}
+
+service DetectService {
+
+    rpc InitEngine(InitEngineRequest) returns (InitEngineResponse);
+    rpc Inference(InferenceRequest) returns (InferenceResponse);
+    rpc DestroyEngine(DestroyEngineRequest) returns (DestroyEngineResponse);
+    rpc CheckEngine(CheckEngineRequest) returns (CheckEngineResponse);
+    rpc CheckAllEngine(google.protobuf.Empty) returns (CheckAllEngineResponse);
+    rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+    rpc UploadModel(stream UploadFileRequest) returns (UploadFileResponse);
+
+}
