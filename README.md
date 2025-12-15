@@ -142,4 +142,3 @@ MIT
 ## 致谢
 
 - gocv、onnxruntime
-- OnnxDet.dll 作者及社区
