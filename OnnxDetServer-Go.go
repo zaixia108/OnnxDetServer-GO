@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -39,7 +41,26 @@ func GetOutboundIP() (string, error) {
 	return localAddr.IP.String(), nil
 }
 
+func SendOSPID() {
+	pid := os.Getpid()
+	srv := &http.Server{Addr: "127.0.0.1:50054"}
+	http.HandleFunc("/getpid", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%d", pid)
+		go func() {
+			fmt.Println("Sent PID to Daemon, shutting down in 3 seconds...")
+			time.Sleep(3 * time.Second)
+			srv.Close()
+		}()
+	})
+	fmt.Println("Waiting for PID requests from Daemon...")
+	err := srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		fmt.Println("HTTP server error:", err)
+	}
+}
+
 func main() {
+	go SendOSPID()
 	ip, err := GetOutboundIP()
 	if err != nil {
 		fmt.Println("Failed to get outbound IP:", err)
