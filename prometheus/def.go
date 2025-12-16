@@ -55,7 +55,7 @@ func prom(port int) {
 
 func CheckProcessInfo() {
 	MemInfo, _ := PID.MemoryInfo()
-	var MemMB = MemInfo.RSS
+	var MemMB = MemInfo.RSS / 1024 / 1024
 	CPUPercent, _ := PID.CPUPercent()
 	CPUPercentFloat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", CPUPercent), 64)
 	memUsage.Set(float64(MemMB))
