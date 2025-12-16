@@ -1,9 +1,11 @@
-package main
+package monitor
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -13,14 +15,16 @@ import (
 )
 
 var (
-	PID      process.Process
-	memUsage prometheus.Gauge
-	cpuUsage prometheus.Gauge
+	PID       process.Process
+	memUsage  prometheus.Gauge
+	cpuUsage  prometheus.Gauge
+	GRPCTotal prometheus.Counter
 )
 
-func prom() {
-	registry := prometheus.NewRegistry()
+var srv *http.Server
 
+func prom(port int) {
+	registry := prometheus.NewRegistry()
 	memUsage = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "memory_usage_Megabytes",
 		Help: "Memory usage in Megabytes",
@@ -31,52 +35,53 @@ func prom() {
 		Help: "CPU usage in percent",
 	})
 
-	registry.MustRegister(memUsage, cpuUsage)
+	GRPCTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "grpc_requests_total",
+		Help: "Total number of gRPC requests processed",
+	})
 
+	registry.MustRegister(memUsage, cpuUsage, GRPCTotal)
 	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
-	http.ListenAndServe(":50053", nil)
+	srv = &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: nil,
+	}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			fmt.Printf("Prometheus server ListenAndServe error: %v\n", err)
+		}
+	}()
 }
 
 func CheckProcessInfo() {
-	for {
-		running, err := PID.IsRunning()
-		if err != nil {
-			panic(err)
-		}
-		if !running {
-			fmt.Println("Main Process has exited.")
-			time.Sleep(3 * time.Second)
-			break
-		} else {
-			MemInfo, _ := PID.MemoryInfo()
-			var MemMB = MemInfo.RSS / 1024 / 1024
-			CPUPercent, _ := PID.CPUPercent()
-			CPUPercentFloat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", CPUPercent), 64)
-			memUsage.Set(float64(MemMB))
-			cpuUsage.Set(CPUPercentFloat)
-			time.Sleep(500 * time.Millisecond)
-		}
-	}
-
+	MemInfo, _ := PID.MemoryInfo()
+	var MemMB = MemInfo.RSS
+	CPUPercent, _ := PID.CPUPercent()
+	CPUPercentFloat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", CPUPercent), 64)
+	memUsage.Set(float64(MemMB))
+	cpuUsage.Set(CPUPercentFloat)
 }
 
 func GotPID() {
-	resp, err := http.Get("http://127.0.0.1:50054/getpid")
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	content, _ := io.ReadAll(resp.Body)
-	fmt.Printf("Got PID: %s\n", string(content))
-	var pid int32
-	fmt.Sscanf(string(content), "%d", &pid)
-	PID.Pid = pid
+	pid := os.Getpid()
+	i32Pid := int32(pid)
+	PID.Pid = i32Pid
 }
 
-func main() {
+func StartMon(port int, ctx context.Context) {
 	PID = process.Process{}
 	GotPID()
-	go prom()
-	time.Sleep(1 * time.Second)
-	CheckProcessInfo()
+	go prom(port)
+checkPcs:
+	for {
+		select {
+		case <-ctx.Done():
+			break checkPcs
+		case <-time.Tick(500 * time.Microsecond):
+			CheckProcessInfo()
+		}
+	}
+	if err := srv.Shutdown(ctx); err != nil {
+		fmt.Printf("Prometheus server Shutdown error: %v\n", err)
+	}
 }

@@ -4,15 +4,14 @@ import (
 	adhoc "OnnxDetServer/Adhoc"
 	backend "OnnxDetServer/gRPC"
 	"OnnxDetServer/logger"
+	monitor "OnnxDetServer/prometheus"
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -41,26 +40,7 @@ func GetOutboundIP() (string, error) {
 	return localAddr.IP.String(), nil
 }
 
-func SendOSPID() {
-	pid := os.Getpid()
-	srv := &http.Server{Addr: "127.0.0.1:50054"}
-	http.HandleFunc("/getpid", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "%d", pid)
-		go func() {
-			fmt.Println("Sent PID to Daemon, shutting down in 3 seconds...")
-			time.Sleep(3 * time.Second)
-			srv.Close()
-		}()
-	})
-	fmt.Println("Waiting for PID requests from Daemon...")
-	err := srv.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
-		fmt.Println("HTTP server error:", err)
-	}
-}
-
 func main() {
-	go SendOSPID()
 	ip, err := GetOutboundIP()
 	if err != nil {
 		fmt.Println("Failed to get outbound IP:", err)
@@ -109,6 +89,7 @@ func main() {
 	fmt.Println("for GPU memory usage, please refer to 1280*1280 Yolo v8s model requires about 0.5GB memory each.")
 	fmt.Println(strings.Repeat("#", 64))
 	fmt.Println("")
+
 	var InstanceClass int
 	switch config.InstanceClass {
 	case "Dml":
@@ -140,6 +121,7 @@ func main() {
 	//gRPC server setup
 	fmt.Println("Starting gRPC Server")
 	server := backend.StartGRPCServer(config.RPCPort)
+	go monitor.StartMon(config.AdhocPort, ctx)
 	<-backend.CloseChannel
 	cancel()
 	server.GracefulStop()
