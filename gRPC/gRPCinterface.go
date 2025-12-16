@@ -4,7 +4,7 @@ import (
 	"OnnxDetServer/engine"
 	iface "OnnxDetServer/interface"
 	"OnnxDetServer/logger"
-	monitor "OnnxDetServer/prometheus"
+	"OnnxDetServer/monitor"
 	"context"
 	"errors"
 	"fmt"

@@ -4,7 +4,7 @@ import (
 	adhoc "OnnxDetServer/Adhoc"
 	backend "OnnxDetServer/gRPC"
 	"OnnxDetServer/logger"
-	monitor "OnnxDetServer/prometheus"
+	"OnnxDetServer/monitor"
 	"context"
 	"fmt"
 	"net"
