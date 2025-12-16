@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -57,7 +57,7 @@ func CheckProcessInfo() {
 	MemInfo, _ := PID.MemoryInfo()
 	var MemMB = MemInfo.RSS / 1024 / 1024
 	CPUPercent, _ := PID.CPUPercent()
-	CPUPercentFloat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", CPUPercent), 64)
+	CPUPercentFloat := math.Round(CPUPercent*100) / 100
 	memUsage.Set(float64(MemMB))
 	cpuUsage.Set(CPUPercentFloat)
 }
@@ -72,12 +72,14 @@ func StartMon(port int, ctx context.Context) {
 	PID = process.Process{}
 	GotPID()
 	go prom(port)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 checkPcs:
 	for {
 		select {
 		case <-ctx.Done():
 			break checkPcs
-		case <-time.Tick(500 * time.Microsecond):
+		case <-ticker.C:
 			CheckProcessInfo()
 		}
 	}
