@@ -4,6 +4,7 @@ import (
 	adhoc "OnnxDetServer/Adhoc"
 	backend "OnnxDetServer/gRPC"
 	"OnnxDetServer/logger"
+	"OnnxDetServer/monitor"
 	"context"
 	"fmt"
 	"net"
@@ -88,6 +89,7 @@ func main() {
 	fmt.Println("for GPU memory usage, please refer to 1280*1280 Yolo v8s model requires about 0.5GB memory each.")
 	fmt.Println(strings.Repeat("#", 64))
 	fmt.Println("")
+
 	var InstanceClass int
 	switch config.InstanceClass {
 	case "Dml":
@@ -119,6 +121,7 @@ func main() {
 	//gRPC server setup
 	fmt.Println("Starting gRPC Server")
 	server := backend.StartGRPCServer(config.RPCPort)
+	go monitor.StartMon(config.AdhocPort, ctx)
 	<-backend.CloseChannel
 	cancel()
 	server.GracefulStop()

@@ -228,18 +228,55 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("Starting target: %s\n", target)
+	var withDaemon bool
+	daemon, err := searchLocations("mon-onnx.exe")
+	if err != nil {
+		withDaemon = false
+	} else {
+		withDaemon = true
+	}
 
 	// Exec the target
-	cmd := exec.Command(target, os.Args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+	cmdOnnx := exec.Command(target, os.Args[1:]...)
+	cmdOnnx.Stdout = os.Stdout
+	cmdOnnx.Stderr = os.Stderr
+	cmdOnnx.Stdin = os.Stdin
+
+	if withDaemon {
+		go func() {
+			if err := cmdOnnx.Run(); err != nil {
+				if exitErr, ok := err.(*exec.ExitError); ok {
+					os.Exit(exitErr.ExitCode())
+				}
+				fmt.Fprintf(os.Stderr, "failed to start target: %v\n", err)
+				time.Sleep(10 * time.Second) // give some time to see the error
+				os.Exit(1)
+			}
+		}()
+		time.Sleep(1 * time.Second) // slight delay to allow daemon to settle
+		// Start via daemon
+		fmt.Printf("Starting via Daemon: %s\n", daemon)
+		cmd := exec.Command(daemon, target)
+		cmd.Args = append(cmd.Args, os.Args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		if err := cmd.Run(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				os.Exit(exitErr.ExitCode())
+			}
+			fmt.Fprintf(os.Stderr, "failed to start via daemon: %v\n", err)
+			time.Sleep(10 * time.Second) // give some time to see the error
+			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "failed to start target: %v\n", err)
-		time.Sleep(10 * time.Second) // give some time to see the error
-		os.Exit(1)
+	} else {
+		if err := cmdOnnx.Run(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				os.Exit(exitErr.ExitCode())
+			}
+			fmt.Fprintf(os.Stderr, "failed to start target: %v\n", err)
+			time.Sleep(10 * time.Second) // give some time to see the error
+			os.Exit(1)
+		}
 	}
 }

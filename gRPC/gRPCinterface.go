@@ -4,6 +4,7 @@ import (
 	"OnnxDetServer/engine"
 	iface "OnnxDetServer/interface"
 	"OnnxDetServer/logger"
+	"OnnxDetServer/monitor"
 	"context"
 	"errors"
 	"fmt"
@@ -123,6 +124,7 @@ type Server struct {
 }
 
 func (s *Server) InitEngine(ctx context.Context, req *InitEngineRequest) (*InitEngineResponse, error) {
+	monitor.GRPCTotal.Inc()
 	detector := engine.Detector{}
 	detector.New()
 	names := iface.NamesConf{}
@@ -156,6 +158,7 @@ func (s *Server) InitEngine(ctx context.Context, req *InitEngineRequest) (*InitE
 }
 
 func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*InferenceResponse, error) {
+	monitor.GRPCTotal.Inc()
 	UUID := req.Id
 	mapMu.RLock()
 	detector, exists := DSequences[UUID]
@@ -229,6 +232,7 @@ func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*Inferen
 }
 
 func (s *Server) DestroyEngine(ctx context.Context, req *DestroyEngineRequest) (*DestroyEngineResponse, error) {
+	monitor.GRPCTotal.Inc()
 	UUID := req.Id
 	mapMu.Lock()
 	detector, exists := DSequences[UUID]
@@ -248,6 +252,7 @@ func (s *Server) DestroyEngine(ctx context.Context, req *DestroyEngineRequest) (
 }
 
 func (s *Server) CheckEngine(ctx context.Context, req *CheckEngineRequest) (*CheckEngineResponse, error) {
+	monitor.GRPCTotal.Inc()
 	UUID := req.Id
 	mapMu.RLock()
 	detector, exists := DSequences[UUID]
@@ -286,6 +291,7 @@ func (s *Server) CheckEngine(ctx context.Context, req *CheckEngineRequest) (*Che
 }
 
 func (s *Server) CheckAllEngine(ctx context.Context, req *emptypb.Empty) (*CheckAllEngineResponse, error) {
+	monitor.GRPCTotal.Inc()
 	mapMu.RLock()
 	allSeq := maps.Clone(DSequences)
 	mapMu.RUnlock()
@@ -322,6 +328,7 @@ func (s *Server) CheckAllEngine(ctx context.Context, req *emptypb.Empty) (*Check
 }
 
 func (s *Server) Shutdown(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	monitor.GRPCTotal.Inc()
 	go func() {
 		time.Sleep(2 * time.Second)
 		mapMu.Lock()
@@ -341,6 +348,7 @@ func (s *Server) Shutdown(ctx context.Context, req *emptypb.Empty) (*emptypb.Emp
 }
 
 func (s *Server) UploadModel(stream DetectService_UploadModelServer) error {
+	monitor.GRPCTotal.Inc()
 	var outFile *os.File
 	var fileSize int
 	var filePath string
