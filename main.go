@@ -201,7 +201,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
-	r.GET("/api/Engine/init/:engineType", func(c *gin.Context) {
+	r.POST("/api/Engine/init/:engineType", func(c *gin.Context) {
 		engineTypeStr := c.Param("engineType")
 		var engineType int
 		_, err := fmt.Sscanf(engineTypeStr, "%d", &engineType)
@@ -346,6 +346,7 @@ func main() {
 		mapMu.Unlock()
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Detector destroyed successfully",
+			"data":    nil,
 		})
 	})
 	r.GET("/api/Engine/check/:UUID", func(c *gin.Context) {
