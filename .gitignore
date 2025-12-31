@@ -12,3 +12,4 @@ src/OnnxDet.lib
 .dist
 .release
 .oldDll
+testdata

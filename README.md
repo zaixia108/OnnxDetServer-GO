@@ -142,3 +142,54 @@ MIT
 ## 致谢
 
 - gocv、onnxruntime
+
+# Todo: OnnxDetServer-GO 项目企业级提升 
+
+## ✅ 测试与质量保障
+
+- [ ] 为 engine/、gRPC/、monitor/、logger/ 等模块添加单元测试（*_test.go）
+- [ ] 添加集成测试，确保 gRPC 全流程可用
+- [ ] 配置并维护覆盖率报表（推荐 `codecov`）
+
+## ✅ 自动化与运维
+
+- [ ] 添加 CI/CD 流水线（如 GitHub Actions），实现自动构建和测试
+- [ ] 添加 Dockerfile，支持容器化部署
+- [ ] 上传构建产物作为 Release 附件
+
+## ✅ 配置与安全
+
+- [ ] 支持从环境变量读取敏感配置，如 RegServerHost
+- [ ] 增强配置校验逻辑
+- [ ] gRPC 服务端增加 TLS 支持
+- [ ] 实现 API Key/JWT 认证
+- [ ] 加入请求频率限制功能（如 Rate Limiting）
+
+## ✅ 文档与接口
+
+- [ ] 完善 proto 文件注释和生成 gRPC 文档（如 grpc-docs、grpc-gateway）
+- [ ] 添加接口使用范例和错误码说明
+- [ ] 项目 README 增加部署与调优案例、容器启动指引
+
+## ✅ 监控与可观测性
+
+- [ ] 添加更多的 Prometheus 指标：推理延迟、模型加载耗时、当前服务引擎数量等
+- [ ] 集成 OpenTelemetry，实现分布式链路追踪
+- [ ] gRPC 日志中引入 TraceID
+
+## ✅ 性能与可用性
+
+- [ ] 增加健康检查接口（HealthCheck）
+- [ ] 支持批量推理 RPC
+- [ ] 支持模型热重载，无需重启即可切换模型
+- [ ] 引擎满载时增加请求背压或优雅降级（如自动降级 CPU）
+
+## ✅ 代码规范
+
+- [ ] 目录名全部小写化（如 `gRPC/` 改为 `grpc/`）
+- [ ] 统一代码风格及变量命名
+- [ ] 集成 golangci-lint 进行静态检查
+
+----
+
+**完成这些 TODO，将极大提升 OnnxDetServer-GO 项目的企业级水平和可维护性。**
