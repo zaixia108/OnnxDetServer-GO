@@ -1,4 +1,4 @@
-package onnx
+package ncnn
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 )
 
 var deps = []string{
-	"OnnxDet.dll",
+	"NcnnDet.dll",
 }
 
 func loadDllWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
@@ -73,9 +73,9 @@ func init() {
 	}
 	// 基于可执行文件路径构建 'src' 目录的绝对路径
 	exeDir := filepath.Dir(exePath)
-	srcDir := filepath.Join(exeDir, "src/OnnxDet")
+	srcDir := filepath.Join(exeDir, "src/NcnnDet")
 
-	mod, err = loadDllWithDeps(srcDir, "OnnxDet.dll")
+	mod, err = loadDllWithDeps(srcDir, "NcnnDet.dll")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", srcDir, err)
 		os.Exit(1)
@@ -103,7 +103,7 @@ func DestroyDetector(p unsafe.Pointer) {
 	procDestroy.Call(uintptr(p))
 }
 
-func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool) bool {
+func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool, useFp16 bool) bool {
 	if p == nil || procInit == nil {
 		return false
 	}
@@ -112,13 +112,17 @@ func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU 
 	if useGPU {
 		ug = 1
 	}
+	var fp16 uintptr
+	if useFp16 {
+		fp16 = 1
+	}
 	r, _, _ := procInit.Call(
 		uintptr(p),
 		uintptr(unsafe.Pointer(mp)),
 		uintptr(math.Float32bits(conf)),
 		uintptr(math.Float32bits(iou)),
 		ug,
-		uintptr(0), // useFp16 is not used in this implementation
+		fp16,
 	)
 	return r != 0
 }

@@ -1,7 +1,6 @@
-package onnx
+package engine
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -10,48 +9,29 @@ import (
 	"unsafe"
 )
 
-var deps = []string{
-	"OnnxDet.dll",
-}
-
-func loadDllWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
-	var missing []string
-	for _, d := range deps {
-		p := filepath.Join(dllDir, d)
-		if _, err := os.Stat(p); err != nil {
-			if os.IsNotExist(err) {
-				missing = append(missing, d)
-			} else {
-				return nil, fmt.Errorf("stat %s: %w", p, err)
-			}
-		}
-	}
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing dependencies in %s: %v", dllDir, missing)
-	}
-
-	k32 := syscall.NewLazyDLL("kernel32.dll")
-	procSetDllDirectoryW := k32.NewProc("SetDllDirectoryW")
-	ptr, err := syscall.UTF16PtrFromString(dllDir)
-	if err != nil {
-		return nil, err
-	}
-	ret, _, callErr := procSetDllDirectoryW.Call(uintptr(unsafe.Pointer(ptr)))
-	if ret == 0 {
-		old := os.Getenv("PATH")
-		_ = os.Setenv("PATH", dllDir+";"+old)
-		if callErr != nil && !errors.Is(callErr, syscall.Errno(0)) {
-			return nil, fmt.Errorf("SetDllDirectoryW failed: %v", callErr)
-		}
-	}
-
-	dllPath := filepath.Join(dllDir, dllName)
-	mod := syscall.NewLazyDLL(dllPath)
-	if err := mod.Load(); err != nil {
-		return nil, fmt.Errorf("load %s failed: %w", dllPath, err)
-	}
-	return mod, nil
-}
+//func loadDllWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
+//	//k32 := syscall.NewLazyDLL("kernel32.dll")
+//	//procSetDllDirectoryW := k32.NewProc("SetDllDirectoryW")
+//	//ptr, err := syscall.UTF16PtrFromString(dllDir)
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//	//ret, _, callErr := procSetDllDirectoryW.Call(uintptr(unsafe.Pointer(ptr)))
+//	//if ret == 0 {
+//	//	old := os.Getenv("PATH")
+//	//	_ = os.Setenv("PATH", dllDir+";"+old)
+//	//	if callErr != nil && !errors.Is(callErr, syscall.Errno(0)) {
+//	//		return nil, fmt.Errorf("SetDllDirectoryW failed: %v", callErr)
+//	//	}
+//	//}
+//
+//	dllPath := filepath.Join(dllDir, dllName)
+//	mod := syscall.NewLazyDLL(dllPath)
+//	if err := mod.Load(); err != nil {
+//		return nil, fmt.Errorf("load %s failed: %w", dllPath, err)
+//	}
+//	return mod, nil
+//}
 
 var (
 	mod                *syscall.LazyDLL
@@ -63,7 +43,7 @@ var (
 	procReleaseResults *syscall.LazyProc
 )
 
-func init() {
+func InitDll(dllDir, dllName string) {
 	var err error
 	// 获取可执行文件的路径
 	exePath, err := os.Executable()
@@ -73,11 +53,15 @@ func init() {
 	}
 	// 基于可执行文件路径构建 'src' 目录的绝对路径
 	exeDir := filepath.Dir(exePath)
-	srcDir := filepath.Join(exeDir, "src/OnnxDet")
+	fmt.Println("exeDir:", exeDir)
+	srcDir := filepath.Join(exeDir, dllDir)
+	fmt.Println("srcDir:", srcDir)
 
-	mod, err = loadDllWithDeps(srcDir, "OnnxDet.dll")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", srcDir, err)
+	dllPath := filepath.Join(srcDir, dllName)
+	fmt.Println("dllPath:", dllPath)
+	mod = syscall.NewLazyDLL(dllPath)
+	if err = mod.Load(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': \n%v\n", srcDir, err)
 		os.Exit(1)
 	}
 	procCreate = mod.NewProc("CreateDetector")
@@ -103,7 +87,7 @@ func DestroyDetector(p unsafe.Pointer) {
 	procDestroy.Call(uintptr(p))
 }
 
-func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool) bool {
+func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool, useFp16 bool) bool {
 	if p == nil || procInit == nil {
 		return false
 	}
@@ -112,13 +96,17 @@ func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU 
 	if useGPU {
 		ug = 1
 	}
+	var fp16 uintptr
+	if useFp16 {
+		fp16 = 1
+	}
 	r, _, _ := procInit.Call(
 		uintptr(p),
 		uintptr(unsafe.Pointer(mp)),
 		uintptr(math.Float32bits(conf)),
 		uintptr(math.Float32bits(iou)),
 		ug,
-		uintptr(0), // useFp16 is not used in this implementation
+		fp16,
 	)
 	return r != 0
 }

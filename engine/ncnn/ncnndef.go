@@ -1,4 +1,4 @@
-package onnx
+package ncnn
 
 import (
 	iface "OnnxDetServer/interface"
@@ -28,6 +28,7 @@ func (d *Detector) CheckConfig() iface.EngineConfig {
 	retConfig.Conf = d.Conf
 	retConfig.Iou = d.Iou
 	retConfig.UseGPU = d.UseGPU
+	retConfig.UseFp16 = d.UseFp16
 	retConfig.Names = d.Names
 	return retConfig
 }
@@ -39,7 +40,7 @@ func (d *Detector) LoadModel(modelPath string, names []string, conf float32, iou
 	d.Iou = iou
 	d.UseGPU = useGPU
 	d.UseFp16 = useFp16
-	state := InitDetector(d.Instance, d.ModelPath, d.Conf, d.Iou, d.UseGPU)
+	state := InitDetector(d.Instance, d.ModelPath, d.Conf, d.Iou, d.UseGPU, d.UseFp16)
 	return state
 }
 
@@ -49,6 +50,7 @@ func (d *Detector) Destroy() {
 	d.Conf = 0
 	d.Iou = 0
 	d.UseGPU = false
+	d.UseFp16 = false
 	d.Instance = nil
 }
 
