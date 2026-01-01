@@ -1,4 +1,4 @@
-package engine
+package ncnn
 
 import (
 	"errors"
@@ -11,10 +11,10 @@ import (
 )
 
 var deps = []string{
-	"onnxruntime.dll",
+	"NcnnDet.dll",
 }
 
-func loadOnnxWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
+func loadDllWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
 	var missing []string
 	for _, d := range deps {
 		p := filepath.Join(dllDir, d)
@@ -59,6 +59,7 @@ var (
 	procDestroy        *syscall.LazyProc
 	procInit           *syscall.LazyProc
 	procDetect         *syscall.LazyProc
+	procSetInputSize   *syscall.LazyProc
 	procReleaseResults *syscall.LazyProc
 )
 
@@ -72,9 +73,9 @@ func init() {
 	}
 	// 基于可执行文件路径构建 'src' 目录的绝对路径
 	exeDir := filepath.Dir(exePath)
-	srcDir := filepath.Join(exeDir, "src")
+	srcDir := filepath.Join(exeDir, "src/NcnnDet")
 
-	mod, err = loadOnnxWithDeps(srcDir, "OnnxDet.dll")
+	mod, err = loadDllWithDeps(srcDir, "NcnnDet.dll")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", srcDir, err)
 		os.Exit(1)
@@ -83,6 +84,7 @@ func init() {
 	procDestroy = mod.NewProc("DestroyDetector")
 	procInit = mod.NewProc("InitDetector")
 	procDetect = mod.NewProc("Detect")
+	procSetInputSize = mod.NewProc("SetInputSize")
 	procReleaseResults = mod.NewProc("ReleaseResults")
 }
 
@@ -101,7 +103,7 @@ func DestroyDetector(p unsafe.Pointer) {
 	procDestroy.Call(uintptr(p))
 }
 
-func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool) bool {
+func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool, useFp16 bool) bool {
 	if p == nil || procInit == nil {
 		return false
 	}
@@ -110,12 +112,17 @@ func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU 
 	if useGPU {
 		ug = 1
 	}
+	var fp16 uintptr
+	if useFp16 {
+		fp16 = 1
+	}
 	r, _, _ := procInit.Call(
 		uintptr(p),
 		uintptr(unsafe.Pointer(mp)),
 		uintptr(math.Float32bits(conf)),
 		uintptr(math.Float32bits(iou)),
 		ug,
+		fp16,
 	)
 	return r != 0
 }
@@ -157,4 +164,15 @@ func Detect(detector unsafe.Pointer, imageData []byte, width, height, channels i
 		procReleaseResults.Call(outBoxesPtr, outScoresPtr, outClassesPtr)
 	}
 	return
+}
+
+func SetDefaultInputSize(size int) bool {
+	if procSetInputSize == nil {
+		return false
+	}
+	// Implementation would go here if required
+	r, _, _ := procSetInputSize.Call(
+		uintptr(size),
+	)
+	return r != 0
 }
