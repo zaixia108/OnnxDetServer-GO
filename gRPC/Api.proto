@@ -35,6 +35,7 @@ message InitEngineRequest {
     float iou = 6;
     bool use_gpu = 7;
     string description = 8;
+    bool use_fp16 = 9;
 }
 
 message InitEngineResponse{

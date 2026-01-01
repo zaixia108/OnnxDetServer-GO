@@ -2,6 +2,7 @@ package main
 
 import (
 	adhoc "OnnxDetServer/Adhoc"
+	"OnnxDetServer/engine"
 	backend "OnnxDetServer/gRPC"
 	"OnnxDetServer/logger"
 	"OnnxDetServer/monitor"
@@ -17,13 +18,14 @@ import (
 )
 
 type configStruct struct {
-	RPCPort       int    `yaml:"RPCPort"`
-	AdhocPort     int    `yaml:"AdhocPort"`
-	WorkersNum    int    `yaml:"workersNum"`
-	InstanceClass string `yaml:"instanceClass"`
-	UseRegServer  bool   `yaml:"UseRegServer"`
-	RegServerPort int    `yaml:"RegServerPort"`
-	RegServerHost string `yaml:"RegServerHost"`
+	RPCPort          int    `yaml:"RPCPort"`
+	AdhocPort        int    `yaml:"AdhocPort"`
+	WorkersNum       int    `yaml:"workersNum"`
+	InstanceClass    string `yaml:"instanceClass"`
+	UseRegServer     bool   `yaml:"UseRegServer"`
+	RegServerPort    int    `yaml:"RegServerPort"`
+	RegServerHost    string `yaml:"RegServerHost"`
+	InferenceBackend string `yaml:"InferenceBackend"`
 }
 
 func GetOutboundIP() (string, error) {
@@ -89,6 +91,8 @@ func main() {
 	fmt.Println("for GPU memory usage, please refer to 1280*1280 Yolo v8s model requires about 0.5GB memory each.")
 	fmt.Println(strings.Repeat("#", 64))
 	fmt.Println("")
+
+	engine.LoadEngine(config.InferenceBackend)
 
 	var InstanceClass int
 	switch config.InstanceClass {

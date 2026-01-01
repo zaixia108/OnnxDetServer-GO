@@ -2,22 +2,18 @@ package iface
 
 import "gocv.io/x/gocv"
 
-type NamesConf struct {
-	IsFile bool
-	Data   any
-}
-
 type RetData struct {
 	Success bool
-	Data    any
+	Data    map[string][]Result
 }
 
 type EngineConfig struct {
-	UseGPU    bool
 	ModelPath string
-	Names     NamesConf
+	Names     []string
 	Conf      float32
 	Iou       float32
+	UseGPU    bool
+	UseFp16   bool
 }
 
 type Position struct {
@@ -38,8 +34,9 @@ type Result struct {
 }
 
 type Backend interface {
-	LoadModel(modelPath string, names NamesConf, conf float32, iou float32, useGPU bool) bool
+	LoadModel(modelPath string, names []string, conf float32, iou float32, useGPU bool, useFp16 bool) bool
 	Detect(image gocv.Mat) RetData
 	Destroy()
 	CheckConfig() EngineConfig
+	SetInputSize(size int)
 }

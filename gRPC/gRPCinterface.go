@@ -39,9 +39,6 @@ var (
 func (d *WorkerID) add2Seq(detector *engine.Detector, description string, engineType int) string {
 	d.detector = detector
 	d.Description = description
-	if engineType == engine.MultiThread {
-		panic("Multi-threading is not supported yet")
-	}
 	d.EngineType = engineType
 	UUID := uuid.New().String()
 	DSequences[UUID] = *d
@@ -127,9 +124,6 @@ func (s *Server) InitEngine(ctx context.Context, req *InitEngineRequest) (*InitE
 	monitor.GRPCTotal.Inc()
 	detector := engine.Detector{}
 	detector.New()
-	names := iface.NamesConf{}
-	names.IsFile = false
-	names.Data = req.Names
 	if req.Iou > 1.0 || req.Iou < 0.0 {
 		return nil, fmt.Errorf("IoU must be between 0.0 and 1.0, got %f", req.Iou)
 	}
@@ -140,7 +134,7 @@ func (s *Server) InitEngine(ctx context.Context, req *InitEngineRequest) (*InitE
 		return nil, fmt.Errorf("model path cannot be empty")
 	}
 	seqMu.Lock()
-	detector.LoadModel(req.ModelPath, names, req.Confidence, req.Iou, req.UseGpu)
+	detector.LoadModel(req.ModelPath, req.Names, req.Confidence, req.Iou, req.UseGpu, req.UseFp16)
 	seqMu.Unlock()
 	seqdet := WorkerID{}
 	seqdet.EngineType = int(req.EngineType)
@@ -184,50 +178,29 @@ func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*Inferen
 			Results: make([]*SingleResult, 0),
 		}, nil
 	}
-	switch v := results.Data.Data.(type) {
-	case string:
-		{
-			logger.Log().Error("detector returned not supported string result:", zap.String("data", v))
-			return &InferenceResponse{
-				Success: false,
-				Results: make([]*SingleResult, 0),
-			}, nil
-		}
-	case map[string][]iface.Result:
-		{
-			detResults := results.Data.Data.(map[string][]iface.Result)
-			singleResults := make([]*SingleResult, 0, len(detResults))
-			for class, resList := range detResults {
-				for _, res := range resList {
-					resBox := make([]*Position, 4)
-					resBox[0] = &Position{X: int32(res.Box.LT.X), Y: int32(res.Box.LT.Y)}
-					resBox[1] = &Position{X: int32(res.Box.RT.X), Y: int32(res.Box.RT.Y)}
-					resBox[2] = &Position{X: int32(res.Box.RB.X), Y: int32(res.Box.RB.Y)}
-					resBox[3] = &Position{X: int32(res.Box.LB.X), Y: int32(res.Box.LB.Y)}
-					singleResult := &SingleResult{
-						Name:       class,
-						Confidence: res.Conf,
-						Box:        resBox,
-						Center:     &Position{X: int32(res.Center.X), Y: int32(res.Center.Y)},
-					}
-					singleResults = append(singleResults, singleResult)
-				}
+
+	detResults := make(map[string][]iface.Result)
+	singleResults := make([]*SingleResult, 0, len(detResults))
+	for class, resList := range detResults {
+		for _, res := range resList {
+			resBox := make([]*Position, 4)
+			resBox[0] = &Position{X: int32(res.Box.LT.X), Y: int32(res.Box.LT.Y)}
+			resBox[1] = &Position{X: int32(res.Box.RT.X), Y: int32(res.Box.RT.Y)}
+			resBox[2] = &Position{X: int32(res.Box.RB.X), Y: int32(res.Box.RB.Y)}
+			resBox[3] = &Position{X: int32(res.Box.LB.X), Y: int32(res.Box.LB.Y)}
+			singleResult := &SingleResult{
+				Name:       class,
+				Confidence: res.Conf,
+				Box:        resBox,
+				Center:     &Position{X: int32(res.Center.X), Y: int32(res.Center.Y)},
 			}
-			return &InferenceResponse{
-				Success: true,
-				Results: singleResults,
-			}, nil
-		}
-	default:
-		{
-			output := fmt.Sprintf("Unknown type: %T", v)
-			logger.Log().Error(output)
-			return &InferenceResponse{
-				Success: false,
-				Results: make([]*SingleResult, 0),
-			}, fmt.Errorf("unexpected data type in results: %T", results.Data.Data)
+			singleResults = append(singleResults, singleResult)
 		}
 	}
+	return &InferenceResponse{
+		Success: true,
+		Results: singleResults,
+	}, nil
 
 }
 
@@ -262,17 +235,7 @@ func (s *Server) CheckEngine(ctx context.Context, req *CheckEngineRequest) (*Che
 	}
 	Dconfig := detector.detector.CheckConfig()
 	names := make([]string, 0)
-	switch v := Dconfig.Names.Data.(type) {
-	case []string:
-		names = Dconfig.Names.Data.([]string)
-	case string:
-		names = []string{}
-		names = append(names, "From File")
-	default:
-		output := fmt.Sprintf("Unknown type: %T", v)
-		logger.Log().Error(output)
-		return nil, fmt.Errorf("unexpected type for names: %T", Dconfig.Names.Data)
-	}
+	names = Dconfig.Names
 	ret := &EngineInfo{
 		Id:          UUID,
 		Description: detector.Description,
@@ -299,15 +262,7 @@ func (s *Server) CheckAllEngine(ctx context.Context, req *emptypb.Empty) (*Check
 	for id, detector := range allSeq {
 		Dconfig := detector.detector.CheckConfig()
 		names := make([]string, 0)
-		switch Dconfig.Names.Data.(type) {
-		case []string:
-			names = Dconfig.Names.Data.([]string)
-		case string:
-			names = []string{}
-			names = append(names, "From File")
-		default:
-			return nil, fmt.Errorf("unexpected type for names: %T", Dconfig.Names.Data)
-		}
+		names = Dconfig.Names
 		engineInfo := &EngineInfo{
 			Id:          id,
 			Description: detector.Description,

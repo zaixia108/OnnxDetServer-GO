@@ -1,7 +1,8 @@
 RPCPort: 50051
 AdhocPort: 50053
 workersNum: 4
-instanceClass: "Dml"
+instanceClass: "Dml" # options: Dml, Cpu, Gpu
 UseRegServer: false
 RegServerPort: 50123
 RegServerHost: "192.168.28.24"
+InferenceBackend: "onnx" # options: onnx, ncnn
