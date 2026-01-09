@@ -2,7 +2,8 @@ package engine
 
 /*
 #CGO_ENABLED=1
-#cgo LDFLAGS: -L src -lNcnnDet
+#cgo CFLAGS: -Isrc
+#cgo LDFLAGS: -Lsrc -lNcnnDet
 #include "src/NcnnDet.h"
 */
 import "C"
