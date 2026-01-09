@@ -42,4 +42,6 @@ type Backend interface {
 	Detect(image gocv.Mat) RetData
 	Destroy()
 	CheckConfig() EngineConfig
+	SetInputSize(size int)
+	SetBlobName(inputName, outputName string)
 }

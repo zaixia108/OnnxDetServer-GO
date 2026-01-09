@@ -149,3 +149,11 @@ func (d *Detector) Detect(img gocv.Mat) iface.RetData {
 	d.State = IDLE
 	return iface.RetData{Success: true, Data: resultDict}
 }
+
+func (d *Detector) SetInputSize(size int) {
+	SetInputSize(d.Instance, size)
+}
+
+func (d *Detector) SetBlobName(inputName, outputName string) {
+	SetBlobName(d.Instance, inputName, outputName)
+}
