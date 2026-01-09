@@ -13,3 +13,4 @@ src/OnnxDet.lib
 .release
 .oldDll
 testdata
+.testasset

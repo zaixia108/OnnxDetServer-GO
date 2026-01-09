@@ -36,7 +36,7 @@ var (
 	mapMu      sync.RWMutex
 )
 
-func (d *WorkerID) add2Seq(detector *engine.Detector, description string, engineType int) string {
+func (d *WorkerID) add2Seq(detector iface.Backend, description string, engineType int) string {
 	d.detector = detector
 	d.Description = description
 	if engineType == engine.MultiThread {
@@ -102,13 +102,12 @@ func runWorker(workerID int) {
 	output := fmt.Sprintf("---Worker %d created\n", workerID)
 	logger.Log().Info(output)
 	for job := range JobQueue {
-		detector := job.worker
-		image := job.image
-		imgData, err := Byte64ToMat(image)
+		imgData, err := Byte64ToMat(job.image)
 		if err != nil {
 			job.Result <- jobResult{Data: iface.RetData{}}
 		} else {
-			result := detector.Detect(imgData)
+			result := job.worker.Detect(imgData)
+			fmt.Println(result)
 			job.Result <- jobResult{Data: result}
 		}
 		err = imgData.Close()
@@ -176,7 +175,6 @@ func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*Inferen
 	}
 	JobQueue <- job
 	results := <-inferResult
-
 	if results.Data.Data == nil {
 		logger.Log().Error("detector returned nil result")
 		return &InferenceResponse{

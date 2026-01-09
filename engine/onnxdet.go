@@ -6,30 +6,23 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
+	"time"
 	"unsafe"
+
+	"gopkg.in/yaml.v3"
 )
 
-var deps = []string{
-	"onnxruntime.dll",
+type BackendConfig struct {
+	UseBackend     string `yaml:"useBackend"`
+	BackendDir     string `yaml:"backendDir"`
+	BackendLibName string `yaml:"backendLibName"`
 }
 
-func loadOnnxWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
-	var missing []string
-	for _, d := range deps {
-		p := filepath.Join(dllDir, d)
-		if _, err := os.Stat(p); err != nil {
-			if os.IsNotExist(err) {
-				missing = append(missing, d)
-			} else {
-				return nil, fmt.Errorf("stat %s: %w", p, err)
-			}
-		}
-	}
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing dependencies in %s: %v", dllDir, missing)
-	}
+var backendCfg BackendConfig
 
+func loadOnnxWithDepsWin64(dllDir, dllName string) (*syscall.LazyDLL, error) {
 	k32 := syscall.NewLazyDLL("kernel32.dll")
 	procSetDllDirectoryW := k32.NewProc("SetDllDirectoryW")
 	ptr, err := syscall.UTF16PtrFromString(dllDir)
@@ -44,7 +37,6 @@ func loadOnnxWithDeps(dllDir, dllName string) (*syscall.LazyDLL, error) {
 			return nil, fmt.Errorf("SetDllDirectoryW failed: %v", callErr)
 		}
 	}
-
 	dllPath := filepath.Join(dllDir, dllName)
 	mod := syscall.NewLazyDLL(dllPath)
 	if err := mod.Load(); err != nil {
@@ -60,11 +52,61 @@ var (
 	procInit           *syscall.LazyProc
 	procDetect         *syscall.LazyProc
 	procReleaseResults *syscall.LazyProc
+	procSetInputSize   *syscall.LazyProc
+	procSetBlobName    *syscall.LazyProc
 )
+
+func detArch(system, arch string) string {
+	switch arch {
+	case "amd64":
+		{
+			return fmt.Sprintf("%s-%s", system, "x64")
+		}
+	case "386":
+		{
+			return fmt.Sprintf("%s-%s", system, "x86")
+		}
+	case "arm64":
+		{
+			return fmt.Sprintf("%s-%s", system, "arm64")
+		}
+	default:
+		panic(fmt.Sprintf("Architecture %s not supported", arch))
+	}
+}
+
+func getPlatform() string {
+	system := runtime.GOOS
+	arch := runtime.GOARCH
+	fmt.Println(system, arch)
+	switch system {
+	case "windows":
+		return detArch(system, arch)
+	case "darwin":
+		panic("MacOS is not supported")
+	case "linux":
+		return detArch(system, arch)
+	default:
+		panic(fmt.Sprintf("Operating system %s not supported", system))
+	}
+}
 
 func init() {
 	var err error
+	Platform := getPlatform()
 	// 获取可执行文件的路径
+	configData, err := os.ReadFile("src/backend.yaml")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read backend.yaml: %v\n", err)
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+	err = yaml.Unmarshal(configData, &backendCfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to parse backend.yaml: %v\n", err)
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get executable path: %v\n", err)
@@ -72,18 +114,25 @@ func init() {
 	}
 	// 基于可执行文件路径构建 'src' 目录的绝对路径
 	exeDir := filepath.Dir(exePath)
-	srcDir := filepath.Join(exeDir, "src")
-
-	mod, err = loadOnnxWithDeps(srcDir, "OnnxDet.dll")
+	dllDir := filepath.Join(exeDir, backendCfg.BackendDir)
+	if Platform == "linux-x64" {
+		panic("Linux is not supported yet, developing...")
+	}
+	mod, err = loadOnnxWithDepsWin64(dllDir, backendCfg.BackendLibName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", srcDir, err)
+		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", dllDir, err)
 		os.Exit(1)
 	}
+	fmt.Println("Lib Loaded...")
 	procCreate = mod.NewProc("CreateDetector")
 	procDestroy = mod.NewProc("DestroyDetector")
 	procInit = mod.NewProc("InitDetector")
 	procDetect = mod.NewProc("Detect")
 	procReleaseResults = mod.NewProc("ReleaseResults")
+	if backendCfg.UseBackend == "ncnn" {
+		procSetInputSize = mod.NewProc("SetInputSize")
+		procSetBlobName = mod.NewProc("SetBlobName")
+	}
 }
 
 func CreateDetector() unsafe.Pointer {
@@ -156,5 +205,30 @@ func Detect(detector unsafe.Pointer, imageData []byte, width, height, channels i
 	if procReleaseResults != nil {
 		procReleaseResults.Call(outBoxesPtr, outScoresPtr, outClassesPtr)
 	}
+	return
+}
+
+func SetInputSize(detector unsafe.Pointer, size int) {
+	if detector == nil || procSetInputSize == nil {
+		return
+	}
+	_, _, _ = procSetInputSize.Call(
+		uintptr(detector),
+		uintptr(size),
+	)
+	return
+}
+
+func SetBlobName(detector unsafe.Pointer, inputBlobName, outputBlobName string) {
+	if detector == nil || procSetBlobName == nil {
+		return
+	}
+	inBlobPtr, _ := syscall.BytePtrFromString(inputBlobName)
+	outBlobPtr, _ := syscall.BytePtrFromString(outputBlobName)
+	_, _, _ = procSetBlobName.Call(
+		uintptr(detector),
+		uintptr(unsafe.Pointer(inBlobPtr)),
+		uintptr(unsafe.Pointer(outBlobPtr)),
+	)
 	return
 }
