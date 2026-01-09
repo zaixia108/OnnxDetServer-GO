@@ -22,7 +22,7 @@ type BackendConfig struct {
 
 var backendCfg BackendConfig
 
-func loadOnnxWithDepsWin64(dllDir, dllName string) (*syscall.LazyDLL, error) {
+func loadBackendWithDepsWin64(dllDir, dllName string) (*syscall.LazyDLL, error) {
 	k32 := syscall.NewLazyDLL("kernel32.dll")
 	procSetDllDirectoryW := k32.NewProc("SetDllDirectoryW")
 	ptr, err := syscall.UTF16PtrFromString(dllDir)
@@ -78,7 +78,6 @@ func detArch(system, arch string) string {
 func getPlatform() string {
 	system := runtime.GOOS
 	arch := runtime.GOARCH
-	fmt.Println(system, arch)
 	switch system {
 	case "windows":
 		return detArch(system, arch)
@@ -117,11 +116,12 @@ func init() {
 	dllDir := filepath.Join(exeDir, backendCfg.BackendDir)
 	if Platform == "linux-x64" {
 		panic("Linux is not supported yet, developing...")
-	}
-	mod, err = loadOnnxWithDepsWin64(dllDir, backendCfg.BackendLibName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", dllDir, err)
-		os.Exit(1)
+	} else {
+		mod, err = loadBackendWithDepsWin64(dllDir, backendCfg.BackendLibName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", dllDir, err)
+			os.Exit(1)
+		}
 	}
 	fmt.Println("Lib Loaded...")
 	procCreate = mod.NewProc("CreateDetector")
