@@ -1,8 +1,8 @@
 package engine
 
 /*
-CGO_ENABLED=1
-#cgo LDFLAGS: -L src -llibNcnnDet
+#CGO_ENABLED=1
+#cgo LDFLAGS: -L src -lNcnnDet
 #include "src/NcnnDet.h"
 */
 import "C"
@@ -66,9 +66,9 @@ func Detect(detector unsafe.Pointer, imageData []byte, width, height, channels i
 	scores = make([]float32, count)
 	classes = make([]int32, count)
 
-	boxesSlice := (*[1 << 30]C.float)(unsafe.Pointer(outBoxesPtr))[: count*4 : count*4]
-	scoresSlice := (*[1 << 30]C.float)(unsafe.Pointer(outScoresPtr))[:count:count]
-	classesSlice := (*[1 << 30]C.int)(unsafe.Pointer(outClassesPtr))[:count:count]
+	boxesSlice := unsafe.Slice((*C.float)(unsafe.Pointer(outBoxesPtr)), int(count*4))
+	scoresSlice := unsafe.Slice((*C.float)(unsafe.Pointer(outScoresPtr)), int(count))
+	classesSlice := unsafe.Slice((*C.int)(unsafe.Pointer(outClassesPtr)), int(count))
 
 	for i := 0; i < int(count); i++ {
 		scores[i] = float32(scoresSlice[i])
