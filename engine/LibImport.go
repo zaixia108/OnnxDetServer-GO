@@ -1,10 +1,9 @@
 package engine
 
 /*
-#CGO_ENABLED=1
 #cgo CFLAGS: -Isrc
-#cgo LDFLAGS: -Lsrc -lNcnnDet
-#include "src/NcnnDet.h"
+#cgo LDFLAGS: -L/usr/loacl/lib -lNcnnDet
+#include "NcnnDet.h"
 */
 import "C"
 import "unsafe"
@@ -18,7 +17,8 @@ func DestroyDetector(p unsafe.Pointer) {
 	if p == nil {
 		return
 	}
-	C.DestroyDetector((*C.Detector)(p))
+	// 修改点 1: 去掉 (*C.Detector) 转换，直接传 unsafe.Pointer
+	C.DestroyDetector(p)
 }
 
 func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU bool) bool {
@@ -33,7 +33,8 @@ func InitDetector(p unsafe.Pointer, modelPath string, conf, iou float32, useGPU 
 	} else {
 		ug = C.bool(false)
 	}
-	ret := C.InitDetector((*C.Detector)(p), cModelPath, C.float(conf), C.float(iou), ug)
+	// 修改点 1: 去掉 (*C.Detector) 转换
+	ret := C.InitDetector(p, cModelPath, C.float(conf), C.float(iou), ug)
 	return bool(ret)
 }
 
@@ -46,8 +47,9 @@ func Detect(detector unsafe.Pointer, imageData []byte, width, height, channels i
 	var outClassesPtr *C.int
 	var outCount C.int
 
+	// 修改点 1: 去掉 (*C.Detector) 转换
 	ret := C.Detect(
-		(*C.Detector)(detector),
+		detector,
 		(*C.uchar)(unsafe.Pointer(&imageData[0])),
 		C.int(width),
 		C.int(height),
@@ -79,10 +81,10 @@ func Detect(detector unsafe.Pointer, imageData []byte, width, height, channels i
 		}
 	}
 
-	// 释放 C 语言分配的内存
-	C.FreeMemory(unsafe.Pointer(outBoxesPtr))
-	C.FreeMemory(unsafe.Pointer(outScoresPtr))
-	C.FreeMemory(unsafe.Pointer(outClassesPtr))
+	// 修改点 2: FreeMemory -> ReleaseResults
+	// 注意：ReleaseResults 需要三个参数，根据头文件定义：
+	// void ReleaseResults(float* boxes, float* scores, int* classes);
+	C.ReleaseResults(outBoxesPtr, outScoresPtr, outClassesPtr)
 
 	return
 }
@@ -91,7 +93,8 @@ func SetInputSize(detector unsafe.Pointer, size int) {
 	if detector == nil {
 		return
 	}
-	C.SetInputSize((*C.Detector)(detector), C.int(size))
+	// 修改点 1: 去掉 (*C.Detector) 转换
+	C.SetInputSize(detector, C.int(size))
 	return
 }
 
@@ -103,6 +106,9 @@ func SetBlobName(detector unsafe.Pointer, inputName, outputName string) {
 	defer C.free(unsafe.Pointer(cInputName))
 	cOutputName := C.CString(outputName)
 	defer C.free(unsafe.Pointer(cOutputName))
-	C.SetBlobName((*C.Detector)(detector), cInputName, cOutputName)
+
+	// 修改点 1: 去掉 (*C.Detector) 转换
+	// 修改点 3: SetBlobName -> SetBlobNames (复数)
+	C.SetBlobNames(detector, cInputName, cOutputName)
 	return
 }
