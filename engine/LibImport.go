@@ -78,7 +78,6 @@ func detArch(system, arch string) string {
 func getPlatform() string {
 	system := runtime.GOOS
 	arch := runtime.GOARCH
-	fmt.Println(system, arch)
 	switch system {
 	case "windows":
 		return detArch(system, arch)
@@ -123,7 +122,6 @@ func init() {
 		fmt.Fprintf(os.Stderr, "failed to load DLLs from '%s': %v\nEnsure `src` directory with DLLs exists next to the executable, and install Visual C++ Redistributable.\n", dllDir, err)
 		os.Exit(1)
 	}
-	fmt.Println("Lib Loaded...")
 	procCreate = mod.NewProc("CreateDetector")
 	procDestroy = mod.NewProc("DestroyDetector")
 	procInit = mod.NewProc("InitDetector")

@@ -2,12 +2,11 @@ package engine
 
 import (
 	iface "OnnxDetServer/interface"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
 	"unsafe"
-
-	"gocv.io/x/gocv"
 )
 
 const UNREGISTERED = 0x0001
@@ -67,7 +66,7 @@ func (d *Detector) CheckConfig() iface.EngineConfig {
 	return retConfig
 }
 
-func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float32, iou float32, useGPU bool) bool {
+func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float32, iou float32, useGPU bool) (bool, error) {
 	if names.IsFile {
 		d.Names, _ = ReadLinesReadFile(names.Data.(string))
 	} else {
@@ -83,12 +82,24 @@ func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float
 		}
 	}
 	d.ModelPath = modelPath
+	switch backendCfg.UseBackend {
+	case "ncnn":
+		if !strings.HasSuffix(d.ModelPath, ".param") {
+			return false, fmt.Errorf("ncnn.LoadModel only supports .param")
+		}
+	case "onnx":
+		if !strings.HasSuffix(d.ModelPath, ".onnx") {
+			return false, fmt.Errorf("onnx.LoadModel only supports .onnx")
+		}
+	default:
+		return false, fmt.Errorf("unsupported backend: %s", backendCfg.UseBackend)
+	}
 	d.Conf = conf
 	d.Iou = iou
 	d.UseGPU = useGPU
 	d.State = IDLE
 	state := InitDetector(d.Instance, d.ModelPath, d.Conf, d.Iou, d.UseGPU)
-	return state
+	return state, nil
 }
 
 func (d *Detector) Destroy() {
@@ -101,7 +112,7 @@ func (d *Detector) Destroy() {
 	d.State = UNREGISTERED
 }
 
-func (d *Detector) Detect(img gocv.Mat) iface.RetData {
+func (d *Detector) Detect(img iface.ImageData) iface.RetData {
 	switch d.State {
 	case UNREGISTERED:
 		return iface.RetData{Success: false, Data: "Detector not registered"}
@@ -111,17 +122,17 @@ func (d *Detector) Detect(img gocv.Mat) iface.RetData {
 		return iface.RetData{Success: false, Data: "Detector is busy"}
 	}
 	d.State = BUSY
-	imgData := img.ToBytes()
-	width := img.Cols()
-	height := img.Rows()
-	channels := img.Channels()
+	imgData := img.Data
+	width := img.Width
+	height := img.Height
+	channels := img.Channels
 
-	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, width, height, channels)
+	resultDict := make(map[string][]iface.Result)
+	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, int(width), int(height), int(channels))
 	if !ok {
 		d.State = IDLE
-		return iface.RetData{Success: false, Data: "Detection failed"}
+		return iface.RetData{Success: false, Data: resultDict}
 	}
-	resultDict := make(map[string][]iface.Result)
 	for item := range d.Names {
 		resultDict[d.Names[item]] = []iface.Result{}
 	}

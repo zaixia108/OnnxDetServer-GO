@@ -6,7 +6,6 @@ import (
 	"OnnxDetServer/logger"
 	"OnnxDetServer/monitor"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"gocv.io/x/gocv"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -50,24 +48,9 @@ func (d *WorkerID) add2Seq(detector iface.Backend, description string, engineTyp
 	return UUID
 }
 
-// Byte64ToMat 将 base64 字符串（可带 data:image/... 前缀）转为 gocv.Mat
-func Byte64ToMat(b64 []byte) (gocv.Mat, error) {
-	// 去掉可能的 data URL 前缀
-	mat, _ := gocv.IMDecode(b64, gocv.IMReadColor)
-	if mat.Empty() {
-		// IMDecode 返回空 Mat 表示解码失败
-		err := mat.Close()
-		if err != nil {
-			return gocv.Mat{}, err
-		}
-		return gocv.NewMat(), errors.New("decoded image is empty or unsupported format")
-	}
-	return mat, nil
-}
-
 type JobPackage struct {
 	worker iface.Backend
-	image  []byte
+	image  iface.ImageData
 	Result chan jobResult
 }
 
@@ -78,8 +61,6 @@ type jobResult struct {
 var JobQueue chan JobPackage
 
 var CloseChannel chan bool
-
-//var ServChan chan *grpc.Server
 
 func StartWorker(workerNum int) {
 	for i := 0; i < workerNum; i++ {
@@ -102,19 +83,8 @@ func runWorker(workerID int) {
 	output := fmt.Sprintf("---Worker %d created\n", workerID)
 	logger.Log().Info(output)
 	for job := range JobQueue {
-		imgData, err := Byte64ToMat(job.image)
-		if err != nil {
-			job.Result <- jobResult{Data: iface.RetData{}}
-		} else {
-			result := job.worker.Detect(imgData)
-			fmt.Println(result)
-			job.Result <- jobResult{Data: result}
-		}
-		err = imgData.Close()
-		if err != nil {
-			output = fmt.Sprintf("⚠️ Worker %d: error closing imgData: %v\n", workerID, err)
-			logger.Log().Error(output)
-		}
+		result := job.worker.Detect(job.image)
+		job.Result <- jobResult{Data: result}
 	}
 }
 
@@ -139,7 +109,17 @@ func (s *Server) InitEngine(ctx context.Context, req *InitEngineRequest) (*InitE
 		return nil, fmt.Errorf("model path cannot be empty")
 	}
 	seqMu.Lock()
-	detector.LoadModel(req.ModelPath, names, req.Confidence, req.Iou, req.UseGpu)
+	_, err := detector.LoadModel(req.ModelPath, names, req.Confidence, req.Iou, req.UseGpu)
+	if err != nil {
+		seqMu.Unlock()
+		logger.Log().Error("Failed to load model", zap.String("ModelPath", req.ModelPath), zap.Error(err))
+		return &InitEngineResponse{
+			Success: false,
+			Id:      "",
+			Message: fmt.Sprintf("Failed to load model: %v", err),
+		}, nil
+	}
+	detector.SetInputSize(int(req.InputSize))
 	seqMu.Unlock()
 	seqdet := WorkerID{}
 	seqdet.EngineType = int(req.EngineType)
@@ -165,7 +145,17 @@ func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*Inferen
 	if !exists {
 		return nil, fmt.Errorf("detector with ID %s not found", UUID)
 	}
-	imageData := req.ImgData
+
+	if req.ImgData == nil || req.ImgData.Data == nil || len(req.ImgData.Data) == 0 || req.ImgData.Width == 0 || req.ImgData.Height == 0 || req.ImgData.Channels == 0 {
+		return nil, fmt.Errorf("image data is invalid")
+	}
+
+	imageData := iface.ImageData{
+		Data:     req.ImgData.Data,
+		Width:    req.ImgData.Width,
+		Height:   req.ImgData.Height,
+		Channels: req.ImgData.Channels,
+	}
 	inferResult := make(chan jobResult)
 	defer close(inferResult)
 	job := JobPackage{
@@ -355,7 +345,10 @@ func (s *Server) UploadModel(stream DetectService_UploadModelServer) error {
 		req, err := stream.Recv()
 		if err == io.EOF {
 			if outFile != nil {
-				outFile.Close()
+				err := outFile.Close()
+				if err != nil {
+					return err
+				}
 			}
 			return stream.SendAndClose(&UploadFileResponse{
 				Success:  true,
