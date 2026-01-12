@@ -146,8 +146,8 @@ func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*Inferen
 		return nil, fmt.Errorf("detector with ID %s not found", UUID)
 	}
 
-	if req.ImgData == nil || req.ImgData.Data == nil || len(req.ImgData.Data) == 0 {
-		return nil, fmt.Errorf("image data is empty")
+	if req.ImgData == nil || req.ImgData.Data == nil || len(req.ImgData.Data) == 0 || req.ImgData.Width == 0 || req.ImgData.Height == 0 || req.ImgData.Channels == 0 {
+		return nil, fmt.Errorf("image data is invalid")
 	}
 
 	imageData := iface.ImageData{
