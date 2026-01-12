@@ -123,7 +123,6 @@ func init() {
 			os.Exit(1)
 		}
 	}
-	fmt.Println("Lib Loaded...")
 	procCreate = mod.NewProc("CreateDetector")
 	procDestroy = mod.NewProc("DestroyDetector")
 	procInit = mod.NewProc("InitDetector")

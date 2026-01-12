@@ -31,6 +31,7 @@ message InitEngineRequest {
     int32 engine_type = 1;
     string model_path = 2;
     repeated string names = 3;
+    int32 input_size = 4;
     float confidence = 5;
     float iou = 6;
     bool use_gpu = 7;
@@ -43,9 +44,16 @@ message InitEngineResponse{
     string message = 3;
 }
 
+message ImageData {
+    bytes data = 1;
+    int32 width = 2;
+    int32 height = 3;
+    int32 channels = 4;
+}
+
 message InferenceRequest {
     string id = 1;
-    bytes img_data = 2;
+    ImageData img_data = 2;
 }
 
 message InferenceResponse{

@@ -247,6 +247,7 @@ type InitEngineRequest struct {
 	EngineType    int32                  `protobuf:"varint,1,opt,name=engine_type,json=engineType,proto3" json:"engine_type,omitempty"`
 	ModelPath     string                 `protobuf:"bytes,2,opt,name=model_path,json=modelPath,proto3" json:"model_path,omitempty"`
 	Names         []string               `protobuf:"bytes,3,rep,name=names,proto3" json:"names,omitempty"`
+	InputSize     int32                  `protobuf:"varint,4,opt,name=input_size,json=inputSize,proto3" json:"input_size,omitempty"`
 	Confidence    float32                `protobuf:"fixed32,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
 	Iou           float32                `protobuf:"fixed32,6,opt,name=iou,proto3" json:"iou,omitempty"`
 	UseGpu        bool                   `protobuf:"varint,7,opt,name=use_gpu,json=useGpu,proto3" json:"use_gpu,omitempty"`
@@ -304,6 +305,13 @@ func (x *InitEngineRequest) GetNames() []string {
 		return x.Names
 	}
 	return nil
+}
+
+func (x *InitEngineRequest) GetInputSize() int32 {
+	if x != nil {
+		return x.InputSize
+	}
+	return 0
 }
 
 func (x *InitEngineRequest) GetConfidence() float32 {
@@ -394,17 +402,85 @@ func (x *InitEngineResponse) GetMessage() string {
 	return ""
 }
 
+type ImageData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Width         int32                  `protobuf:"varint,2,opt,name=width,proto3" json:"width,omitempty"`
+	Height        int32                  `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
+	Channels      int32                  `protobuf:"varint,4,opt,name=channels,proto3" json:"channels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImageData) Reset() {
+	*x = ImageData{}
+	mi := &file_Api_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImageData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImageData) ProtoMessage() {}
+
+func (x *ImageData) ProtoReflect() protoreflect.Message {
+	mi := &file_Api_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImageData.ProtoReflect.Descriptor instead.
+func (*ImageData) Descriptor() ([]byte, []int) {
+	return file_Api_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ImageData) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ImageData) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *ImageData) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *ImageData) GetChannels() int32 {
+	if x != nil {
+		return x.Channels
+	}
+	return 0
+}
+
 type InferenceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ImgData       []byte                 `protobuf:"bytes,2,opt,name=img_data,json=imgData,proto3" json:"img_data,omitempty"`
+	ImgData       *ImageData             `protobuf:"bytes,2,opt,name=img_data,json=imgData,proto3" json:"img_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InferenceRequest) Reset() {
 	*x = InferenceRequest{}
-	mi := &file_Api_proto_msgTypes[5]
+	mi := &file_Api_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -416,7 +492,7 @@ func (x *InferenceRequest) String() string {
 func (*InferenceRequest) ProtoMessage() {}
 
 func (x *InferenceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[5]
+	mi := &file_Api_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -429,7 +505,7 @@ func (x *InferenceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InferenceRequest.ProtoReflect.Descriptor instead.
 func (*InferenceRequest) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{5}
+	return file_Api_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *InferenceRequest) GetId() string {
@@ -439,7 +515,7 @@ func (x *InferenceRequest) GetId() string {
 	return ""
 }
 
-func (x *InferenceRequest) GetImgData() []byte {
+func (x *InferenceRequest) GetImgData() *ImageData {
 	if x != nil {
 		return x.ImgData
 	}
@@ -456,7 +532,7 @@ type InferenceResponse struct {
 
 func (x *InferenceResponse) Reset() {
 	*x = InferenceResponse{}
-	mi := &file_Api_proto_msgTypes[6]
+	mi := &file_Api_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -468,7 +544,7 @@ func (x *InferenceResponse) String() string {
 func (*InferenceResponse) ProtoMessage() {}
 
 func (x *InferenceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[6]
+	mi := &file_Api_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -481,7 +557,7 @@ func (x *InferenceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InferenceResponse.ProtoReflect.Descriptor instead.
 func (*InferenceResponse) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{6}
+	return file_Api_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *InferenceResponse) GetSuccess() bool {
@@ -507,7 +583,7 @@ type DestroyEngineRequest struct {
 
 func (x *DestroyEngineRequest) Reset() {
 	*x = DestroyEngineRequest{}
-	mi := &file_Api_proto_msgTypes[7]
+	mi := &file_Api_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +595,7 @@ func (x *DestroyEngineRequest) String() string {
 func (*DestroyEngineRequest) ProtoMessage() {}
 
 func (x *DestroyEngineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[7]
+	mi := &file_Api_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +608,7 @@ func (x *DestroyEngineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroyEngineRequest.ProtoReflect.Descriptor instead.
 func (*DestroyEngineRequest) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{7}
+	return file_Api_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DestroyEngineRequest) GetId() string {
@@ -552,7 +628,7 @@ type DestroyEngineResponse struct {
 
 func (x *DestroyEngineResponse) Reset() {
 	*x = DestroyEngineResponse{}
-	mi := &file_Api_proto_msgTypes[8]
+	mi := &file_Api_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +640,7 @@ func (x *DestroyEngineResponse) String() string {
 func (*DestroyEngineResponse) ProtoMessage() {}
 
 func (x *DestroyEngineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[8]
+	mi := &file_Api_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +653,7 @@ func (x *DestroyEngineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroyEngineResponse.ProtoReflect.Descriptor instead.
 func (*DestroyEngineResponse) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{8}
+	return file_Api_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DestroyEngineResponse) GetSuccess() bool {
@@ -603,7 +679,7 @@ type CheckEngineRequest struct {
 
 func (x *CheckEngineRequest) Reset() {
 	*x = CheckEngineRequest{}
-	mi := &file_Api_proto_msgTypes[9]
+	mi := &file_Api_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +691,7 @@ func (x *CheckEngineRequest) String() string {
 func (*CheckEngineRequest) ProtoMessage() {}
 
 func (x *CheckEngineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[9]
+	mi := &file_Api_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +704,7 @@ func (x *CheckEngineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckEngineRequest.ProtoReflect.Descriptor instead.
 func (*CheckEngineRequest) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{9}
+	return file_Api_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CheckEngineRequest) GetId() string {
@@ -649,7 +725,7 @@ type CheckEngineResponse struct {
 
 func (x *CheckEngineResponse) Reset() {
 	*x = CheckEngineResponse{}
-	mi := &file_Api_proto_msgTypes[10]
+	mi := &file_Api_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -661,7 +737,7 @@ func (x *CheckEngineResponse) String() string {
 func (*CheckEngineResponse) ProtoMessage() {}
 
 func (x *CheckEngineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[10]
+	mi := &file_Api_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -674,7 +750,7 @@ func (x *CheckEngineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckEngineResponse.ProtoReflect.Descriptor instead.
 func (*CheckEngineResponse) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{10}
+	return file_Api_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CheckEngineResponse) GetSuccess() bool {
@@ -709,7 +785,7 @@ type CheckAllEngineResponse struct {
 
 func (x *CheckAllEngineResponse) Reset() {
 	*x = CheckAllEngineResponse{}
-	mi := &file_Api_proto_msgTypes[11]
+	mi := &file_Api_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -721,7 +797,7 @@ func (x *CheckAllEngineResponse) String() string {
 func (*CheckAllEngineResponse) ProtoMessage() {}
 
 func (x *CheckAllEngineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[11]
+	mi := &file_Api_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -734,7 +810,7 @@ func (x *CheckAllEngineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckAllEngineResponse.ProtoReflect.Descriptor instead.
 func (*CheckAllEngineResponse) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{11}
+	return file_Api_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CheckAllEngineResponse) GetSuccess() bool {
@@ -769,7 +845,7 @@ type FileInfo struct {
 
 func (x *FileInfo) Reset() {
 	*x = FileInfo{}
-	mi := &file_Api_proto_msgTypes[12]
+	mi := &file_Api_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -781,7 +857,7 @@ func (x *FileInfo) String() string {
 func (*FileInfo) ProtoMessage() {}
 
 func (x *FileInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[12]
+	mi := &file_Api_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -794,7 +870,7 @@ func (x *FileInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileInfo.ProtoReflect.Descriptor instead.
 func (*FileInfo) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{12}
+	return file_Api_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FileInfo) GetName() string {
@@ -831,7 +907,7 @@ type UploadFileRequest struct {
 
 func (x *UploadFileRequest) Reset() {
 	*x = UploadFileRequest{}
-	mi := &file_Api_proto_msgTypes[13]
+	mi := &file_Api_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +919,7 @@ func (x *UploadFileRequest) String() string {
 func (*UploadFileRequest) ProtoMessage() {}
 
 func (x *UploadFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[13]
+	mi := &file_Api_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +932,7 @@ func (x *UploadFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadFileRequest.ProtoReflect.Descriptor instead.
 func (*UploadFileRequest) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{13}
+	return file_Api_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UploadFileRequest) GetData() isUploadFileRequest_Data {
@@ -911,7 +987,7 @@ type UploadFileResponse struct {
 
 func (x *UploadFileResponse) Reset() {
 	*x = UploadFileResponse{}
-	mi := &file_Api_proto_msgTypes[14]
+	mi := &file_Api_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +999,7 @@ func (x *UploadFileResponse) String() string {
 func (*UploadFileResponse) ProtoMessage() {}
 
 func (x *UploadFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_Api_proto_msgTypes[14]
+	mi := &file_Api_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1012,7 @@ func (x *UploadFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadFileResponse.ProtoReflect.Descriptor instead.
 func (*UploadFileResponse) Descriptor() ([]byte, []int) {
-	return file_Api_proto_rawDescGZIP(), []int{14}
+	return file_Api_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UploadFileResponse) GetSuccess() bool {
@@ -988,13 +1064,15 @@ const file_Api_proto_rawDesc = "" +
 	"confidence\x18\x02 \x01(\x02R\n" +
 	"confidence\x12!\n" +
 	"\x03box\x18\x03 \x03(\v2\x0f.proto.PositionR\x03box\x12'\n" +
-	"\x06center\x18\x04 \x01(\v2\x0f.proto.PositionR\x06center\"\xd6\x01\n" +
+	"\x06center\x18\x04 \x01(\v2\x0f.proto.PositionR\x06center\"\xf5\x01\n" +
 	"\x11InitEngineRequest\x12\x1f\n" +
 	"\vengine_type\x18\x01 \x01(\x05R\n" +
 	"engineType\x12\x1d\n" +
 	"\n" +
 	"model_path\x18\x02 \x01(\tR\tmodelPath\x12\x14\n" +
-	"\x05names\x18\x03 \x03(\tR\x05names\x12\x1e\n" +
+	"\x05names\x18\x03 \x03(\tR\x05names\x12\x1d\n" +
+	"\n" +
+	"input_size\x18\x04 \x01(\x05R\tinputSize\x12\x1e\n" +
 	"\n" +
 	"confidence\x18\x05 \x01(\x02R\n" +
 	"confidence\x12\x10\n" +
@@ -1004,10 +1082,15 @@ const file_Api_proto_rawDesc = "" +
 	"\x12InitEngineResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"=\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"i\n" +
+	"\tImageData\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
+	"\x05width\x18\x02 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x03 \x01(\x05R\x06height\x12\x1a\n" +
+	"\bchannels\x18\x04 \x01(\x05R\bchannels\"O\n" +
 	"\x10InferenceRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bimg_data\x18\x02 \x01(\fR\aimgData\"\\\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
+	"\bimg_data\x18\x02 \x01(\v2\x10.proto.ImageDataR\aimgData\"\\\n" +
 	"\x11InferenceResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12-\n" +
 	"\aresults\x18\x02 \x03(\v2\x13.proto.SingleResultR\aresults\"&\n" +
@@ -1063,51 +1146,53 @@ func file_Api_proto_rawDescGZIP() []byte {
 	return file_Api_proto_rawDescData
 }
 
-var file_Api_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_Api_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_Api_proto_goTypes = []any{
 	(*EngineInfo)(nil),             // 0: proto.EngineInfo
 	(*Position)(nil),               // 1: proto.Position
 	(*SingleResult)(nil),           // 2: proto.SingleResult
 	(*InitEngineRequest)(nil),      // 3: proto.InitEngineRequest
 	(*InitEngineResponse)(nil),     // 4: proto.InitEngineResponse
-	(*InferenceRequest)(nil),       // 5: proto.InferenceRequest
-	(*InferenceResponse)(nil),      // 6: proto.InferenceResponse
-	(*DestroyEngineRequest)(nil),   // 7: proto.DestroyEngineRequest
-	(*DestroyEngineResponse)(nil),  // 8: proto.DestroyEngineResponse
-	(*CheckEngineRequest)(nil),     // 9: proto.CheckEngineRequest
-	(*CheckEngineResponse)(nil),    // 10: proto.CheckEngineResponse
-	(*CheckAllEngineResponse)(nil), // 11: proto.CheckAllEngineResponse
-	(*FileInfo)(nil),               // 12: proto.FileInfo
-	(*UploadFileRequest)(nil),      // 13: proto.UploadFileRequest
-	(*UploadFileResponse)(nil),     // 14: proto.UploadFileResponse
-	(*emptypb.Empty)(nil),          // 15: google.protobuf.Empty
+	(*ImageData)(nil),              // 5: proto.ImageData
+	(*InferenceRequest)(nil),       // 6: proto.InferenceRequest
+	(*InferenceResponse)(nil),      // 7: proto.InferenceResponse
+	(*DestroyEngineRequest)(nil),   // 8: proto.DestroyEngineRequest
+	(*DestroyEngineResponse)(nil),  // 9: proto.DestroyEngineResponse
+	(*CheckEngineRequest)(nil),     // 10: proto.CheckEngineRequest
+	(*CheckEngineResponse)(nil),    // 11: proto.CheckEngineResponse
+	(*CheckAllEngineResponse)(nil), // 12: proto.CheckAllEngineResponse
+	(*FileInfo)(nil),               // 13: proto.FileInfo
+	(*UploadFileRequest)(nil),      // 14: proto.UploadFileRequest
+	(*UploadFileResponse)(nil),     // 15: proto.UploadFileResponse
+	(*emptypb.Empty)(nil),          // 16: google.protobuf.Empty
 }
 var file_Api_proto_depIdxs = []int32{
 	1,  // 0: proto.SingleResult.box:type_name -> proto.Position
 	1,  // 1: proto.SingleResult.center:type_name -> proto.Position
-	2,  // 2: proto.InferenceResponse.results:type_name -> proto.SingleResult
-	0,  // 3: proto.CheckEngineResponse.engine_info:type_name -> proto.EngineInfo
-	0,  // 4: proto.CheckAllEngineResponse.engines:type_name -> proto.EngineInfo
-	12, // 5: proto.UploadFileRequest.file_info:type_name -> proto.FileInfo
-	3,  // 6: proto.DetectService.InitEngine:input_type -> proto.InitEngineRequest
-	5,  // 7: proto.DetectService.Inference:input_type -> proto.InferenceRequest
-	7,  // 8: proto.DetectService.DestroyEngine:input_type -> proto.DestroyEngineRequest
-	9,  // 9: proto.DetectService.CheckEngine:input_type -> proto.CheckEngineRequest
-	15, // 10: proto.DetectService.CheckAllEngine:input_type -> google.protobuf.Empty
-	15, // 11: proto.DetectService.Shutdown:input_type -> google.protobuf.Empty
-	13, // 12: proto.DetectService.UploadModel:input_type -> proto.UploadFileRequest
-	4,  // 13: proto.DetectService.InitEngine:output_type -> proto.InitEngineResponse
-	6,  // 14: proto.DetectService.Inference:output_type -> proto.InferenceResponse
-	8,  // 15: proto.DetectService.DestroyEngine:output_type -> proto.DestroyEngineResponse
-	10, // 16: proto.DetectService.CheckEngine:output_type -> proto.CheckEngineResponse
-	11, // 17: proto.DetectService.CheckAllEngine:output_type -> proto.CheckAllEngineResponse
-	15, // 18: proto.DetectService.Shutdown:output_type -> google.protobuf.Empty
-	14, // 19: proto.DetectService.UploadModel:output_type -> proto.UploadFileResponse
-	13, // [13:20] is the sub-list for method output_type
-	6,  // [6:13] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	5,  // 2: proto.InferenceRequest.img_data:type_name -> proto.ImageData
+	2,  // 3: proto.InferenceResponse.results:type_name -> proto.SingleResult
+	0,  // 4: proto.CheckEngineResponse.engine_info:type_name -> proto.EngineInfo
+	0,  // 5: proto.CheckAllEngineResponse.engines:type_name -> proto.EngineInfo
+	13, // 6: proto.UploadFileRequest.file_info:type_name -> proto.FileInfo
+	3,  // 7: proto.DetectService.InitEngine:input_type -> proto.InitEngineRequest
+	6,  // 8: proto.DetectService.Inference:input_type -> proto.InferenceRequest
+	8,  // 9: proto.DetectService.DestroyEngine:input_type -> proto.DestroyEngineRequest
+	10, // 10: proto.DetectService.CheckEngine:input_type -> proto.CheckEngineRequest
+	16, // 11: proto.DetectService.CheckAllEngine:input_type -> google.protobuf.Empty
+	16, // 12: proto.DetectService.Shutdown:input_type -> google.protobuf.Empty
+	14, // 13: proto.DetectService.UploadModel:input_type -> proto.UploadFileRequest
+	4,  // 14: proto.DetectService.InitEngine:output_type -> proto.InitEngineResponse
+	7,  // 15: proto.DetectService.Inference:output_type -> proto.InferenceResponse
+	9,  // 16: proto.DetectService.DestroyEngine:output_type -> proto.DestroyEngineResponse
+	11, // 17: proto.DetectService.CheckEngine:output_type -> proto.CheckEngineResponse
+	12, // 18: proto.DetectService.CheckAllEngine:output_type -> proto.CheckAllEngineResponse
+	16, // 19: proto.DetectService.Shutdown:output_type -> google.protobuf.Empty
+	15, // 20: proto.DetectService.UploadModel:output_type -> proto.UploadFileResponse
+	14, // [14:21] is the sub-list for method output_type
+	7,  // [7:14] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_Api_proto_init() }
@@ -1115,7 +1200,7 @@ func file_Api_proto_init() {
 	if File_Api_proto != nil {
 		return
 	}
-	file_Api_proto_msgTypes[13].OneofWrappers = []any{
+	file_Api_proto_msgTypes[14].OneofWrappers = []any{
 		(*UploadFileRequest_FileInfo)(nil),
 		(*UploadFileRequest_ChunkData)(nil),
 	}
@@ -1125,7 +1210,7 @@ func file_Api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_Api_proto_rawDesc), len(file_Api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
