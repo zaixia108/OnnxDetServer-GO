@@ -1,6 +1,5 @@
 /*.jpg
 /models
-/src
 /*.dll
 112913
 /*.1
@@ -14,3 +13,8 @@ src/OnnxDet.lib
 .oldDll
 testdata
 .testasset
+src/*.dll
+src/Makefile_1
+src/NcnnDet
+src/old
+src/OnnxDet
