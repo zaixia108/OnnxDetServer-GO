@@ -48,21 +48,6 @@ func (d *WorkerID) add2Seq(detector iface.Backend, description string, engineTyp
 	return UUID
 }
 
-// Byte64ToMat 将 base64 字符串（可带 data:image/... 前缀）转为 gocv.Mat
-//func Byte64ToMat(b64 []byte) ([]byte, error) {
-//	// 去掉可能的 data URL 前缀
-//	mat, _ := gocv.IMDecode(b64, gocv.IMReadColor)
-//	if mat.Empty() {
-//		// IMDecode 返回空 Mat 表示解码失败
-//		err := mat.Close()
-//		if err != nil {
-//			return gocv.Mat{}, err
-//		}
-//		return gocv.NewMat(), errors.New("decoded image is empty or unsupported format")
-//	}
-//	return mat, nil
-//}
-
 type JobPackage struct {
 	worker iface.Backend
 	image  iface.ImageData
@@ -76,8 +61,6 @@ type jobResult struct {
 var JobQueue chan JobPackage
 
 var CloseChannel chan bool
-
-//var ServChan chan *grpc.Server
 
 func StartWorker(workerNum int) {
 	for i := 0; i < workerNum; i++ {
@@ -162,6 +145,11 @@ func (s *Server) Inference(ctx context.Context, req *InferenceRequest) (*Inferen
 	if !exists {
 		return nil, fmt.Errorf("detector with ID %s not found", UUID)
 	}
+
+	if req.ImgData == nil || req.ImgData.Data == nil || len(req.ImgData.Data) == 0 {
+		return nil, fmt.Errorf("image data is empty")
+	}
+
 	imageData := iface.ImageData{
 		Data:     req.ImgData.Data,
 		Width:    req.ImgData.Width,

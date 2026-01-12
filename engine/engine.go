@@ -84,11 +84,11 @@ func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float
 	d.ModelPath = modelPath
 	switch backendCfg.UseBackend {
 	case "ncnn":
-		if d.ModelPath[len(d.ModelPath)-5:] != ".param" {
+		if !strings.HasSuffix(d.ModelPath, ".param") {
 			return false, fmt.Errorf("ncnn.LoadModel only supports .param")
 		}
 	case "onnx":
-		if d.ModelPath[len(d.ModelPath)-5:] != ".onnx" {
+		if !strings.HasSuffix(d.ModelPath, ".onnx") {
 			return false, fmt.Errorf("onnx.LoadModel only supports .onnx")
 		}
 	default:

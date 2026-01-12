@@ -26,13 +26,16 @@ func TestDetector_All(t *testing.T) {
 	})
 
 	t.Run("Test LoadModel", func(t *testing.T) {
-		state := d.LoadModel(
+		state, err := d.LoadModel(
 			model_path,
 			names,
 			conf,
 			iou,
 			false,
 		)
+		if err != nil {
+			t.Errorf("Detector.LoadModel() returned an error: %v", err)
+		}
 		assert.Equal(t, state, true)
 	})
 
