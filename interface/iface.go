@@ -36,7 +36,7 @@ type Result struct {
 }
 
 type Backend interface {
-	LoadModel(modelPath string, names NamesConf, conf float32, iou float32, useGPU bool) bool
+	LoadModel(modelPath string, names NamesConf, conf float32, iou float32, useGPU bool) (bool, error)
 	Detect(image ImageData) RetData
 	Destroy()
 	CheckConfig() EngineConfig

@@ -101,7 +101,6 @@ func runWorker(workerID int) {
 	logger.Log().Info(output)
 	for job := range JobQueue {
 		result := job.worker.Detect(job.image)
-		fmt.Println(result)
 		job.Result <- jobResult{Data: result}
 	}
 }
@@ -127,7 +126,16 @@ func (s *Server) InitEngine(ctx context.Context, req *InitEngineRequest) (*InitE
 		return nil, fmt.Errorf("model path cannot be empty")
 	}
 	seqMu.Lock()
-	detector.LoadModel(req.ModelPath, names, req.Confidence, req.Iou, req.UseGpu)
+	_, err := detector.LoadModel(req.ModelPath, names, req.Confidence, req.Iou, req.UseGpu)
+	if err != nil {
+		seqMu.Unlock()
+		logger.Log().Error("Failed to load model", zap.String("ModelPath", req.ModelPath), zap.Error(err))
+		return &InitEngineResponse{
+			Success: false,
+			Id:      "",
+			Message: fmt.Sprintf("Failed to load model: %v", err),
+		}, nil
+	}
 	detector.SetInputSize(int(req.InputSize))
 	seqMu.Unlock()
 	seqdet := WorkerID{}
@@ -349,7 +357,10 @@ func (s *Server) UploadModel(stream DetectService_UploadModelServer) error {
 		req, err := stream.Recv()
 		if err == io.EOF {
 			if outFile != nil {
-				outFile.Close()
+				err := outFile.Close()
+				if err != nil {
+					return err
+				}
 			}
 			return stream.SendAndClose(&UploadFileResponse{
 				Success:  true,

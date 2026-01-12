@@ -2,6 +2,7 @@ package engine
 
 import (
 	iface "OnnxDetServer/interface"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -65,7 +66,7 @@ func (d *Detector) CheckConfig() iface.EngineConfig {
 	return retConfig
 }
 
-func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float32, iou float32, useGPU bool) bool {
+func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float32, iou float32, useGPU bool) (bool, error) {
 	if names.IsFile {
 		d.Names, _ = ReadLinesReadFile(names.Data.(string))
 	} else {
@@ -81,12 +82,24 @@ func (d *Detector) LoadModel(modelPath string, names iface.NamesConf, conf float
 		}
 	}
 	d.ModelPath = modelPath
+	switch backendCfg.UseBackend {
+	case "ncnn":
+		if d.ModelPath[len(d.ModelPath)-5:] != ".param" {
+			return false, fmt.Errorf("ncnn.LoadModel only supports .param")
+		}
+	case "onnx":
+		if d.ModelPath[len(d.ModelPath)-5:] != ".onnx" {
+			return false, fmt.Errorf("onnx.LoadModel only supports .onnx")
+		}
+	default:
+		return false, fmt.Errorf("unsupported backend: %s", backendCfg.UseBackend)
+	}
 	d.Conf = conf
 	d.Iou = iou
 	d.UseGPU = useGPU
 	d.State = IDLE
 	state := InitDetector(d.Instance, d.ModelPath, d.Conf, d.Iou, d.UseGPU)
-	return state
+	return state, nil
 }
 
 func (d *Detector) Destroy() {
@@ -114,12 +127,12 @@ func (d *Detector) Detect(img iface.ImageData) iface.RetData {
 	height := img.Height
 	channels := img.Channels
 
+	resultDict := make(map[string][]iface.Result)
 	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, int(width), int(height), int(channels))
 	if !ok {
 		d.State = IDLE
-		return iface.RetData{Success: false, Data: "Detection failed"}
+		return iface.RetData{Success: false, Data: resultDict}
 	}
-	resultDict := make(map[string][]iface.Result)
 	for item := range d.Names {
 		resultDict[d.Names[item]] = []iface.Result{}
 	}
