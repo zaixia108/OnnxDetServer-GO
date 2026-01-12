@@ -18,3 +18,7 @@ src/Makefile_1
 src/NcnnDet
 src/old
 src/OnnxDet
+release
+keys
+sources.list
+src/libNcnnDet.so
