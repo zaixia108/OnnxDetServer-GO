@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"unsafe"
-
-	"gocv.io/x/gocv"
 )
 
 const UNREGISTERED = 0x0001
@@ -101,7 +99,7 @@ func (d *Detector) Destroy() {
 	d.State = UNREGISTERED
 }
 
-func (d *Detector) Detect(img gocv.Mat) iface.RetData {
+func (d *Detector) Detect(img iface.ImageData) iface.RetData {
 	switch d.State {
 	case UNREGISTERED:
 		return iface.RetData{Success: false, Data: "Detector not registered"}
@@ -111,12 +109,12 @@ func (d *Detector) Detect(img gocv.Mat) iface.RetData {
 		return iface.RetData{Success: false, Data: "Detector is busy"}
 	}
 	d.State = BUSY
-	imgData := img.ToBytes()
-	width := img.Cols()
-	height := img.Rows()
-	channels := img.Channels()
+	imgData := img.Data
+	width := img.Width
+	height := img.Height
+	channels := img.Channels
 
-	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, width, height, channels)
+	boxes, scores, classes, _, ok := Detect(d.Instance, imgData, int(width), int(height), int(channels))
 	if !ok {
 		d.State = IDLE
 		return iface.RetData{Success: false, Data: "Detection failed"}

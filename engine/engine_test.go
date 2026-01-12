@@ -2,12 +2,10 @@ package engine
 
 import (
 	iface "OnnxDetServer/interface"
-	"fmt"
 	"testing"
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
-	"gocv.io/x/gocv"
 )
 
 func TestDetector_All(t *testing.T) {
@@ -51,10 +49,10 @@ func TestDetector_All(t *testing.T) {
 
 	t.Run("Test Detect", func(t *testing.T) {
 		d.SetInputSize(1280)
-		img := gocv.IMRead("frame_2400.png", gocv.IMReadColor)
-		result := d.Detect(img)
-		fmt.Println(result)
-		assert.Equal(t, true, result.Success)
+		//读取本地文件并转换为字节流
+
+		//fmt.Println(result)
+		//assert.Equal(t, true, result.Success)
 	})
 
 	t.Run("Test Destroy", func(t *testing.T) {

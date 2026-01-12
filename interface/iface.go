@@ -1,7 +1,5 @@
 package iface
 
-import "gocv.io/x/gocv"
-
 type NamesConf struct {
 	IsFile bool
 	Data   any
@@ -39,9 +37,16 @@ type Result struct {
 
 type Backend interface {
 	LoadModel(modelPath string, names NamesConf, conf float32, iou float32, useGPU bool) bool
-	Detect(image gocv.Mat) RetData
+	Detect(image ImageData) RetData
 	Destroy()
 	CheckConfig() EngineConfig
 	SetInputSize(size int)
 	SetBlobName(inputName, outputName string)
+}
+
+type ImageData struct {
+	Data     []byte
+	Width    int32
+	Height   int32
+	Channels int32
 }
